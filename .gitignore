@@ -1,0 +1,11 @@
+# Local environment files with secrets
+.env
+**/.env
+
+# Generated files from templates
+*.butane
+*.ign
+
+# Backup files
+*.bak
+*~
