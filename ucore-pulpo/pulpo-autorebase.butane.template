@@ -16,24 +16,6 @@ storage:
         name: core
       group:
         name: core
-    - path: /var/syncthing/config
-      mode: 0755
-      user:
-        name: core
-      group:
-        name: core
-    - path: /var/syncthing/data
-      mode: 0755
-      user:
-        name: core
-      group:
-        name: core
-    - path: /var/syncthing/data/pool0
-      mode: 0755
-      user:
-        name: core
-      group:
-        name: core
     - path: /var/home/core/.config
       mode: 0755
       user:
@@ -94,8 +76,7 @@ storage:
           Environment=PUID=0
           Environment=PGID=0
           Environment=STGUIADDRESS=${SYNCTHING_GUI_ADDRESS}
-          Volume=/var/syncthing/config:/var/syncthing/config:Z
-          Volume=/var/syncthing/data/pool0:/var/syncthing/data/pool0:Z
+          Volume=/var/syncthing:/var/syncthing:Z
           AutoUpdate=registry
 
           [Service]
