@@ -9,7 +9,49 @@ passwd:
 storage:
   directories:
     - path: /etc/ucore-autorebase
-      mode: 0754
+      mode: 0755
+    - path: /var/syncthing
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/syncthing/config
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/syncthing/data
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/syncthing/data/pool0
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/home/core/.config
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/home/core/.config/containers
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/home/core/.config/containers/systemd
+      mode: 0755
+      user:
+        name: core
+      group:
+        name: core
   files:
     - path: /etc/hostname
       mode: 0644
@@ -32,6 +74,37 @@ storage:
 
           [ipv6]
           method=disabled
+    - path: /var/home/core/.config/containers/systemd/syncthing.container
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [Unit]
+          Description=Syncthing container
+          Wants=network-online.target
+          After=network-online.target
+          ConditionPathExists=/etc/ucore-autorebase/signed
+
+          [Container]
+          Image=docker.io/syncthing/syncthing:latest
+          Network=host
+          Environment=PUID=0
+          Environment=PGID=0
+          Environment=STGUIADDRESS=${SYNCTHING_GUI_ADDRESS}
+          Volume=/var/syncthing/config:/var/syncthing/config:Z
+          Volume=/var/syncthing/data/pool0:/var/syncthing/data/pool0:Z
+          AutoUpdate=registry
+
+          [Service]
+          Restart=always
+
+          [Install]
+          WantedBy=default.target
+    - path: /var/lib/systemd/linger/core
+      mode: 0644
 systemd:
   units:
     - name: ucore-unsigned-autorebase.service
@@ -68,5 +141,24 @@ systemd:
         ExecStart=/usr/bin/touch /etc/ucore-autorebase/signed
         ExecStart=/usr/bin/systemctl disable ucore-signed-autorebase.service
         ExecStart=/usr/bin/systemctl reboot
+        [Install]
+        WantedBy=multi-user.target
+    - name: syncthing-firewall-setup.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Configure firewall for Syncthing
+        ConditionPathExists=/etc/ucore-autorebase/signed
+        ConditionPathExists=!/etc/ucore-autorebase/syncthing-firewall-configured
+        After=firewalld.service
+        Wants=firewalld.service
+        Before=syncthing.service
+        [Service]
+        Type=oneshot
+        ExecStart=/usr/bin/firewall-cmd --permanent --add-service=syncthing
+        ExecStart=/usr/bin/firewall-cmd --permanent --add-service=syncthing-gui
+        ExecStart=/usr/bin/firewall-cmd --reload
+        ExecStart=/usr/bin/touch /etc/ucore-autorebase/syncthing-firewall-configured
+        ExecStart=/usr/bin/systemctl disable syncthing-firewall-setup.service
         [Install]
         WantedBy=multi-user.target
