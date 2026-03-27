@@ -54,7 +54,7 @@ make help
 ```
 
 This will:
-1. Substitute variables from `.env` into the `.butane.template` file
+1. Substitute variables from `.env` into the `*.butane.template` file
 2. Generate a `.butane` config file
 3. Transpile the `.butane` file into an Ignition `.ign` config
 

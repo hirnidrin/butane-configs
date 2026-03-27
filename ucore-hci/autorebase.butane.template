@@ -14,7 +14,7 @@ storage:
     - path: /etc/hostname
       mode: 0644
       contents:
-        inline: ucore-hci
+        inline: ${HOSTNAME}
     - path: /etc/NetworkManager/system-connections/static-eno1.nmconnection
       mode: 0600
       contents:
