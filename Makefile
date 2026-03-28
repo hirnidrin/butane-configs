@@ -1,16 +1,17 @@
-.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader
+.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader brucore-quader
 
 # Default target builds all server configs
-all: ucore-pulpo ucore-hci ucore-quader
+all: ucore-pulpo ucore-hci ucore-quader brucore-quader
 
 help:
 	@echo "Available targets:"
-	@echo "  all          - Build all server configs (default)"
-	@echo "  ucore-pulpo  - Build ucore-pulpo server config"
-	@echo "  ucore-hci    - Build ucore-hci server config"
-	@echo "  ucore-quader - Build ucore-quader server config"
-	@echo "  clean        - Remove all generated files"
-	@echo "  help         - Show this help message"
+	@echo "  all            - Build all server configs (default)"
+	@echo "  ucore-pulpo    - Build ucore-pulpo server config"
+	@echo "  ucore-hci      - Build ucore-hci server config"
+	@echo "  ucore-quader   - Build ucore-quader server config"
+	@echo "  brucore-quader - Build brucore-quader server config"
+	@echo "  clean          - Remove all generated files"
+	@echo "  help           - Show this help message"
 	@echo ""
 	@echo "Before building, ensure each server directory has a .env file"
 	@echo "Copy from .env.example and fill with real values"
@@ -56,6 +57,20 @@ ucore-quader/autorebase.butane: ucore-quader/autorebase.butane.template ucore-qu
 	@echo "Generating Butane config from template: $@"
 	@test -f ucore-quader/.env || (echo "Error: ucore-quader/.env not found. Copy from ucore-quader/.env.example and fill with real values" && exit 1)
 	@set -a; . ucore-quader/.env; set +a; envsubst < $< > $@
+
+# brucore-quader server build
+#
+brucore-quader: brucore-quader/autorebase.ign
+brucore-quader/: brucore-quader
+#
+brucore-quader/autorebase.ign: brucore-quader/autorebase.butane
+	@echo "Building Ignition config: $@"
+	butane --strict < $< > $@
+#
+brucore-quader/autorebase.butane: brucore-quader/autorebase.butane.template brucore-quader/.env
+	@echo "Generating Butane config from template: $@"
+	@test -f brucore-quader/.env || (echo "Error: brucore-quader/.env not found. Copy from brucore-quader/.env.example and fill with real values" && exit 1)
+	@set -a; . brucore-quader/.env; set +a; envsubst < $< > $@
 
 # Clean all generated files
 clean:
