@@ -1,4 +1,4 @@
-.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader brucore-quader
+.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader brucore-quader wucore-quader
 
 # Default target builds all server configs
 all: ucore-pulpo ucore-hci ucore-quader brucore-quader
@@ -10,6 +10,7 @@ help:
 	@echo "  ucore-hci      - Build ucore-hci server config"
 	@echo "  ucore-quader   - Build ucore-quader server config"
 	@echo "  brucore-quader - Build brucore-quader server config"
+	@echo "  wucore-quader  - Build wucore-quader server config"
 	@echo "  clean          - Remove all generated files"
 	@echo "  help           - Show this help message"
 	@echo ""
@@ -72,10 +73,26 @@ brucore-quader/autorebase.butane: brucore-quader/autorebase.butane.template bruc
 	@test -f brucore-quader/.env || (echo "Error: brucore-quader/.env not found. Copy from brucore-quader/.env.example and fill with real values" && exit 1)
 	@set -a; . brucore-quader/.env; set +a; envsubst < $< > $@
 
+# wucore-quader server build
+#
+wucore-quader: wucore-quader/autorebase.ign
+wucore-quader/: wucore-quader
+#
+wucore-quader/autorebase.ign: wucore-quader/autorebase.butane
+	@echo "Building Ignition config: $@"
+	butane --strict < $< > $@
+#
+wucore-quader/autorebase.butane: wucore-quader/autorebase.butane.template wucore-quader/.env
+	@echo "Generating Butane config from template: $@"
+	@test -f wucore-quader/.env || (echo "Error: wucore-quader/.env not found. Copy from wucore-quader/.env.example and fill with real values" && exit 1)
+	@set -a; . wucore-quader/.env; set +a; envsubst < $< > $@
+
 # Clean all generated files
 clean:
 	@echo "Cleaning generated files..."
 	rm -f ucore-pulpo/*.butane ucore-pulpo/*.ign
 	rm -f ucore-hci/*.butane ucore-hci/*.ign
 	rm -f ucore-quader/*.butane ucore-quader/*.ign
+	rm -f brucore-quader/*.butane brucore-quader/*.ign
+	rm -f wucore-quader/*.butane wucore-quader/*.ign
 	@echo "Done"
