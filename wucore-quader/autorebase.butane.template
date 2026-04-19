@@ -48,6 +48,20 @@ storage:
           /usr/bin/ipmitool raw 0x30 0x70 0x66 0x01 0x00 0x2A
           # Peripheral fans: 29% duty cycle (~500rpm)
           /usr/bin/ipmitool raw 0x30 0x70 0x66 0x01 0x01 0x1d
+  disks:
+    - device: /dev/nvme0n1
+      wipe_table: ${WIPE_RAID}
+    - device: /dev/nvme1n1
+      wipe_table: ${WIPE_RAID}
+  filesystems:
+    - device: /dev/nvme0n1
+      format: btrfs
+      label: K3S_DATA
+      wipe_filesystem: ${WIPE_RAID}
+      options: ["--data", "raid1", "--metadata", "raid1", "/dev/nvme1n1"]
+      path: /var/lib/rancher/k3s
+      mount_options: ["defaults", "compress=zstd", "noatime"]
+      with_mount_unit: true
 systemd:
   units:
     - name: rebase-to-unverified.service
