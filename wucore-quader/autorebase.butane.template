@@ -1,5 +1,5 @@
 variant: fcos
-version: 1.6.0
+version: 1.7.0
 passwd:
   users:
     - name: core
@@ -48,6 +48,16 @@ storage:
           /usr/bin/ipmitool raw 0x30 0x70 0x66 0x01 0x00 0x2A
           # Peripheral fans: 29% duty cycle (~500rpm)
           /usr/bin/ipmitool raw 0x30 0x70 0x66 0x01 0x01 0x1d
+    - path: /etc/rancher/k3s/config.yaml
+      mode: 0644
+      contents:
+        inline: |
+          write-kubeconfig-mode: "0644"
+          tls-san:
+            - ${HOSTNAME}
+            - ${IPV4_ADDRESS}
+          disable:
+            - traefik
   disks:
     - device: /dev/nvme0n1
       wipe_table: ${WIPE_RAID}
@@ -106,11 +116,29 @@ systemd:
         [Unit]
         Description=Set IPMI fan speeds after each boot
         ConditionPathExists=/etc/ignition-task-tracking/1-rebase-to-signed
-        After=multi-user.target
         [Service]
         Type=oneshot
         StandardOutput=journal+console
         ExecStart=/usr/local/bin/set-fanspeeds.sh
         ExecStart=/usr/bin/touch /etc/ignition-task-tracking/2-fanspeed-service
+        [Install]
+        WantedBy=multi-user.target
+    - name: k3s-install.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Install k3s server+agent (single-node) and reboot
+        ConditionPathExists=/etc/ignition-task-tracking/2-fanspeed-service
+        ConditionPathExists=!/etc/ignition-task-tracking/3-k3s-installed
+        After=network-online.target var-lib-rancher-k3s.mount fanspeed.service
+        Wants=network-online.target
+        [Service]
+        Type=oneshot
+        StandardOutput=journal+console
+        Environment=INSTALL_K3S_EXEC=server
+        ExecStart=/usr/bin/bash -c 'curl -sfL https://get.k3s.io | sh -'
+        ExecStart=/usr/bin/touch /etc/ignition-task-tracking/3-k3s-installed
+        ExecStart=/usr/bin/systemctl disable k3s-install.service
+        ExecStart=/usr/bin/systemctl reboot
         [Install]
         WantedBy=multi-user.target
