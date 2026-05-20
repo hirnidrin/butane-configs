@@ -10,7 +10,13 @@ storage:
   directories:
     - path: /etc/containers/volumes/wg-easy
       mode: 0700
+    - path: /etc/containers/volumes/caddy-config
+      mode: 0700
+    - path: /etc/containers/volumes/caddy-data
+      mode: 0700
   files:
+
+    # setup networking: hostname, static IP config
     - path: /etc/hostname
       mode: 0644
       contents:
@@ -26,18 +32,40 @@ storage:
 
           [ipv4]
           method=manual
-          address1=${IPV4_ADDRESS}
+          address1=${IPV4_ADDRESS}/${IPV4_SUBNET_LENGTH}
           gateway=${IPV4_GATEWAY}
           dns=${IPV4_DNS};
 
           [ipv6]
           method=disabled
+
+    # load required kernel modules
     - path: /etc/modules-load.d/wg-easy.conf
       mode: 0644
       contents:
         inline: |
           wireguard
           nft_masq
+
+    # caddy Configuration File - secure the wg-easy webadmin connection
+    - path: /etc/containers/volumes/caddy-config/Caddyfile
+      mode: 0644
+      contents:
+        inline: |
+          # 1. secure internal LAN traffic on alternative HTTPS port 8443 with self-signed cert 
+          ${IPV4_ADDRESS}:8443 {
+              tls internal
+              
+              # proxy over localhost to the published wg-easy web UI port
+              reverse_proxy 127.0.0.1:51822
+          }
+
+          # 2. intercept connections to the original wg-easy webadmin port and redirect to secure port 
+          http://${IPV4_ADDRESS}:51821 {
+              redir https://{host}:8443{uri} permanent
+          }
+
+    # quadlet: wg-easy container network
     - path: /etc/containers/systemd/wg-easy.network
       mode: 0644
       contents:
@@ -45,12 +73,14 @@ storage:
           [Network]
           NetworkName=wg-easy
           IPv6=true
+
+    # quadlet: wg-easy container
     - path: /etc/containers/systemd/wg-easy.container
       mode: 0644
       contents:
         inline: |
           [Unit]
-          Description=wg-easy WireGuard VPN UI
+          Description=wg-easy WireGuard VPN Engine
           Wants=network-online.target
           After=network-online.target
 
@@ -60,10 +90,11 @@ storage:
           AutoUpdate=registry
           Volume=/etc/containers/volumes/wg-easy:/etc/wireguard:Z
           Network=wg-easy.network
+          
+          # Wireguard VPN UDP traffic - listen to world
           PublishPort=51820:51820/udp
-          PublishPort=51821:51821/tcp
-
-          Environment=INSECURE=true
+          # wg-easy webadmin port is locked to localhost, only caddy can reach it, not world
+          PublishPort=127.0.0.1:51822:51821/tcp
 
           AddCapability=NET_ADMIN
           AddCapability=NET_RAW
@@ -73,6 +104,33 @@ storage:
           Sysctl=net.ipv6.conf.all.disable_ipv6=0
           Sysctl=net.ipv6.conf.all.forwarding=1
           Sysctl=net.ipv6.conf.default.forwarding=1
+
+          [Service]
+          Restart=always
+
+          [Install]
+          WantedBy=default.target
+
+    # quadlet: caddy reverse proxy container on host network
+    - path: /etc/containers/systemd/caddy.container
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Caddy Reverse Proxy (Host Network)
+          Wants=network-online.target
+          After=network-online.target
+
+          [Container]
+          ContainerName=caddy
+          Image=docker.io/library/caddy:2-alpine
+          AutoUpdate=registry
+          
+          # Attaches the container directly to the host network stack
+          Network=host
+          
+          Volume=/etc/containers/volumes/caddy-config/Caddyfile:/etc/caddy/Caddyfile:Z
+          Volume=/etc/containers/volumes/caddy-data:/data:Z
 
           [Service]
           Restart=always
