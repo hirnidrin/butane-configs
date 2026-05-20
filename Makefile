@@ -1,4 +1,4 @@
-.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader brucore-quader wucore-quader
+.PHONY: all clean help ucore-pulpo ucore-hci ucore-quader brucore-quader wucore-quader fcos-wg-easy
 
 # Default target builds all server configs
 all: ucore-pulpo ucore-hci ucore-quader brucore-quader
@@ -11,6 +11,7 @@ help:
 	@echo "  ucore-quader   - Build ucore-quader server config"
 	@echo "  brucore-quader - Build brucore-quader server config"
 	@echo "  wucore-quader  - Build wucore-quader server config"
+	@echo "  fcos-wg-easy   - Build fcos-wg-easy server config"
 	@echo "  clean          - Remove all generated files"
 	@echo "  help           - Show this help message"
 	@echo ""
@@ -87,6 +88,20 @@ wucore-quader/autorebase.butane: wucore-quader/autorebase.butane.template wucore
 	@test -f wucore-quader/.env || (echo "Error: wucore-quader/.env not found. Copy from wucore-quader/.env.example and fill with real values" && exit 1)
 	@set -a; . wucore-quader/.env; set +a; envsubst < $< > $@
 
+# fcos-wg-easy server build
+#
+fcos-wg-easy: fcos-wg-easy/autorebase.ign
+fcos-wg-easy/: fcos-wg-easy
+#
+fcos-wg-easy/autorebase.ign: fcos-wg-easy/autorebase.butane
+	@echo "Building Ignition config: $@"
+	butane --strict < $< > $@
+#
+fcos-wg-easy/autorebase.butane: fcos-wg-easy/autorebase.butane.template fcos-wg-easy/.env
+	@echo "Generating Butane config from template: $@"
+	@test -f fcos-wg-easy/.env || (echo "Error: fcos-wg-easy/.env not found. Copy from fcos-wg-easy/.env.example and fill with real values" && exit 1)
+	@set -a; . fcos-wg-easy/.env; set +a; envsubst < $< > $@
+
 # Clean all generated files
 clean:
 	@echo "Cleaning generated files..."
@@ -95,4 +110,5 @@ clean:
 	rm -f ucore-quader/*.butane ucore-quader/*.ign
 	rm -f brucore-quader/*.butane brucore-quader/*.ign
 	rm -f wucore-quader/*.butane wucore-quader/*.ign
+	rm -f fcos-wg-easy/*.butane fcos-wg-easy/*.ign
 	@echo "Done"
