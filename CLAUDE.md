@@ -8,13 +8,13 @@ This repo manages Butane/Ignition provisioning configs for Fedora CoreOS (FCOS) 
 
 **Tools required:** `butane` (transpiler), `envsubst` (variable substitution), `mkpasswd` (password hashing)
 
-## Build Commands
+## Currently existing configs
 
-```bash
-make                    # Build all server configs (except wucore-quader)
-make <server-name>      # Build a specific server (e.g. make wucore-quader)
-make clean              # Remove all generated .butane and .ign files
-```
+See [README.md](./README.md#server-summary)
+
+## Build commands, deployment instructions
+
+See [README.md](./README.md#repo-usage)
 
 The build pipeline per server: `.env` + `*.butane.template` → `envsubst` → `*.butane` → `butane --strict` → `*.ign`
 
@@ -37,25 +37,6 @@ One-shot setup services use a **flag-file sequencing pattern** to chain steps ac
 
 Older servers (`ucore-pulpo`, `ucore-hci`, `ucore-quader`) use ad-hoc flag paths under `/etc/ucore-autorebase/` — leave those as-is.
 
-## Server Summary
-
-| Server | Base image | Notable extras |
-|--------|-----------|----------------|
-| `ucore-pulpo` | `ghcr.io/ublue-os/ucore:stable` | Syncthing container (Quadlet) |
-| `ucore-hci` | `ghcr.io/ublue-os/ucore-hci:stable` | Minimal, no extras |
-| `ucore-quader` | `ghcr.io/ublue-os/ucore:stable` | Syncthing + IPMI fan control |
-| `brucore-quader` | `ghcr.io/hirnidrin/brucore:latest` | Custom image, IPMI fan control |
-| `wucore-quader` | `ghcr.io/hirnidrin/wucore:latest` | Custom image, IPMI fans, k3s on NVMe BTRFS RAID1 |
-| `fcos-wg-easy` | plain FCOS (no rebase) | wg-easy WireGuard VPN UI (system quadlet, nftables) |
-
 ## Secrets and Generated Files
 
-`.env`, `*.butane`, and `*.ign` are gitignored — only `*.butane.template` and `.env.example` are committed. To set up a server locally:
-
-```bash
-cp <server>/.env.example <server>/.env
-# Generate SSH key: ssh-keygen -t ed25519
-# Generate password hash: mkpasswd --method yescrypt
-# Edit <server>/.env with real values
-make <server>
-```
+`.env`, `*.butane`, and `*.ign` are gitignored — only `*.butane.template` and `.env.example` are committed.
