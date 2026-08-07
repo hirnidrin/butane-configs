@@ -19,6 +19,7 @@ addresses, and `make <name>` produces the Ignition config.
 | `base-core-user` | `core` user with SSH key and password hash |
 | `base-hostname` | static hostname |
 | `net-static-ip` | static IPv4 on one ethernet interface, IPv6 disabled |
+| `storage-btrfs-raid1` | two NVMe devices mirrored into one btrfs RAID1, mounted at boot |
 | `app-wg-easy` | wg-easy WireGuard engine + webadmin, as a system quadlet |
 | `app-caddy-tls-proxy` | caddy on the host network, TLS for a localhost-only upstream |
 | `hw-ipmi-fans` | pin IPMI fan duty cycles on every boot (needs `ipmitool` in the image) |

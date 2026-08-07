@@ -1,0 +1,34 @@
+# storage-btrfs-raid1 - mirror two NVMe devices into one btrfs RAID1 filesystem
+# and mount it at boot
+#
+# Optional vars: RAID_DEVICE_A, RAID_DEVICE_B, RAID_LABEL, RAID_MOUNT_PATH,
+#                RAID_WIPE (see defaults.env)
+#
+# Harvested from the retired wucore-quader config, where it backed the k3s
+# data directory - hence the defaults. Data and metadata are both mirrored, so
+# the array survives losing either device.
+#
+# DESTRUCTIVE when RAID_WIPE=true: that wipes the partition tables and any
+# existing filesystem on BOTH devices. Ignition only runs on first boot, but
+# check the device names against `lsblk` on the target before provisioning -
+# NVMe enumeration order is not guaranteed to match what you saw in the
+# installer.
+#
+# `with_mount_unit: true` generates a systemd mount unit named after the mount
+# path (RAID_MOUNT_PATH=/var/lib/rancher/k3s -> var-lib-rancher-k3s.mount).
+# Services that need the array up must order themselves After= that unit.
+storage:
+  disks:
+    - device: ${RAID_DEVICE_A}
+      wipe_table: ${RAID_WIPE}
+    - device: ${RAID_DEVICE_B}
+      wipe_table: ${RAID_WIPE}
+  filesystems:
+    - device: ${RAID_DEVICE_A}
+      format: btrfs
+      label: ${RAID_LABEL}
+      wipe_filesystem: ${RAID_WIPE}
+      options: ["--data", "raid1", "--metadata", "raid1", "${RAID_DEVICE_B}"]
+      path: ${RAID_MOUNT_PATH}
+      mount_options: ["defaults", "compress=zstd", "noatime"]
+      with_mount_unit: true

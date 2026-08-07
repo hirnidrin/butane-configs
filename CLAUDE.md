@@ -48,7 +48,7 @@ build — they are the pre- and post-substitution intermediates.
 
 ## Writing a snippet
 
-1. One concern per snippet. Prefix by kind: `base-`, `net-`, `hw-`, `app-`.
+1. One concern per snippet. Prefix by kind: `base-`, `net-`, `storage-`, `hw-`, `app-`.
 2. `snippet.yaml` is a **partial** Butane config — no `variant`/`version`, those live in the frame.
 3. Open it with a comment block stating what it does, its required vars, and its optional vars.
 4. Put anything longer than a few lines in `files/` and reference it, instead of inlining it:
