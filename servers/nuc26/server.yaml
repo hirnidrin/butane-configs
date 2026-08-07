@@ -1,0 +1,17 @@
+# nuc26 - WireGuard VPN gateway on plain Fedora CoreOS (no rebase)
+#
+# Build:  make nuc26
+#
+# wg-easy serves the VPN datapath and a web admin UI; caddy fronts that UI
+# with TLS. See the repo README for the post-install steps.
+snippets:
+  - base-core-user
+  - base-hostname
+  - net-static-ip
+  - app-wg-easy
+  - app-caddy-tls-proxy
+
+# --- frame -------------------------------------------------------------------
+# Merged last, so anything added here wins over the snippets above.
+variant: fcos
+version: 1.6.0

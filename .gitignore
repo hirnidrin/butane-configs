@@ -6,6 +6,10 @@
 *.butane
 *.ign
 
+# Build staging (merged config + substituted payload files)
+.build/
+**/.build/
+
 # Backup files
 *.bak
 *~

@@ -1,0 +1,9 @@
+# base-hostname - set the static hostname
+#
+# Required vars: HOSTNAME
+storage:
+  files:
+    - path: /etc/hostname
+      mode: 0644
+      contents:
+        inline: ${HOSTNAME}

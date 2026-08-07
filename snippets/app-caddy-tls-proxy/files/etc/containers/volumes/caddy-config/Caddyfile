@@ -1,0 +1,13 @@
+# 1. secure internal LAN traffic on alternative HTTPS port with self-signed cert
+${IPV4_ADDRESS}:${CADDY_TLS_PORT} {
+    tls internal
+
+    # proxy over localhost to the published upstream web UI port
+    reverse_proxy ${CADDY_UPSTREAM}
+}
+
+# 2. intercept connections to the upstream's own plain-HTTP port and redirect
+#    to the secure port
+http://${IPV4_ADDRESS}:${CADDY_REDIRECT_PORT} {
+    redir https://{host}:${CADDY_TLS_PORT}{uri} permanent
+}

@@ -1,100 +1,88 @@
 # Butane Configs
 
-This repository contains Butane configuration templates for deploying Fedora CoreOS based servers.
+Butane/Ignition provisioning configs for Fedora CoreOS based servers.
 
-## Server Summary
+Each server is composed from reusable snippets rather than written as one monolithic template:
+`servers/<name>/server.yaml` lists the snippets it wants, `.env` supplies the secrets and
+addresses, and `make <name>` produces the Ignition config.
 
-| Server | Base image | Notable extras |
-|--------|-----------|----------------|
-| `ucore-pulpo` | `ghcr.io/ublue-os/ucore:stable` | Syncthing container (user-space quadlet) |
-| `ucore-hci` | `ghcr.io/ublue-os/ucore-hci:stable` | Minimal, no extras |
-| `ucore-quader` | `ghcr.io/ublue-os/ucore:stable` | Syncthing + IPMI fan control |
-| `brucore-quader` | `ghcr.io/hirnidrin/brucore:latest` | Custom image, IPMI fan control |
-| `wucore-quader` | `ghcr.io/hirnidrin/wucore:latest` | Custom image, IPMI fans, k3s on NVMe BTRFS RAID1 |
-| `fcos-wg-easy` | plain FCOS (no rebase) | wg-easy WireGuard VPN UI (system quadlet, nftables) |
+## Servers
 
-Additional details for some setups see below.
+| Server | Base | What it does |
+|--------|------|--------------|
+| `nuc26` | plain FCOS (no rebase) | WireGuard VPN gateway — wg-easy + caddy TLS proxy |
 
-### fcos-wg-easy
+## Snippets
 
-* Static WireGuard endpoint in LAN, with Webadmin for client config management.
-* Simple, efficient and free alternative to corporate VPN server solutions.
+| Snippet | Purpose |
+|---------|---------|
+| `base-core-user` | `core` user with SSH key and password hash |
+| `base-hostname` | static hostname |
+| `net-static-ip` | static IPv4 on one ethernet interface, IPv6 disabled |
+| `app-wg-easy` | wg-easy WireGuard engine + webadmin, as a system quadlet |
+| `app-caddy-tls-proxy` | caddy on the host network, TLS for a localhost-only upstream |
+| `hw-ipmi-fans` | pin IPMI fan duty cycles on every boot (needs `ipmitool` in the image) |
 
-Notes
-
-* WireGuard service listens on port 51820 for incoming road warrior connections
-  * Setup port-forwarding: firewall WAN port 51820 -> fcos-wg-easy LAN IP address, port 51820
-* wg-easy webadmin listens on fcos-wg-easy LAN IP address, port 8843 - don't expose this to WAN
-  * `https://<fcos-wg-easy-server-ip>:8843`
-  * Webadmin TLS connection secured by a `caddy`reverse proxy, issues a self-signed cert
-* After initial setup, open the webadmin and
-  * run the config steps
-  * Change the default legacy `iptables`-based **PostUp** and **PostDown** hooks to `nftables`, see [wg-easy documentation](https://wg-easy.github.io/wg-easy/latest/examples/tutorials/podman-nft/#edit-hooks)
-  * Reboot -> ready for setting up road warrior client configs.
+Each snippet documents its variables in the comment block at the top of its `snippet.yaml`, and
+ships defaults for the optional ones in `defaults.env`.
 
 ## Repo structure
 
-Each server has its own subdirectory containing:
-- `*.butane.template` - Butane config templates with variable placeholders
-- `.env.example` - Example environment variables (committed to git)
-- `.env` - Real credentials (local only, gitignored)
+```
+snippets/<snippet>/snippet.yaml    partial Butane config
+snippets/<snippet>/defaults.env    default values for its optional variables
+snippets/<snippet>/files/…         payload files: quadlets, scripts, systemd units
+servers/<name>/server.yaml         snippet list + frame (variant, version, overrides)
+servers/<name>/.env.example        variables the server must supply (committed)
+servers/<name>/.env                real values (gitignored)
+servers/<name>/files/…             optional per-server overrides of snippet payloads
+```
 
-## Repo usage
+## Usage
 
-### Use an existing server config
-
-1. Navigate to the server directory you want to configure:
-   ```sh
-   cd ucore-pulpo
-   ```
-
-2. Copy the example environment file:
-   ```sh
-   cp .env.example .env
-   ```
-
-3. Edit `.env` with your real credentials:
-   ```sh
-   # Generate SSH key if needed
-   ssh-keygen -t ed25519
-
-   # Generate password hash
-   mkpasswd --method yescrypt
-
-   # Populate .env with real values
-   nano .env
-   ```
-
-### Building configs
-
-From the repository root:
+### Build an existing server
 
 ```sh
-# Build all server configs
-make
+cd servers/nuc26
+cp .env.example .env
 
-# Build specific server
-make ucore-pulpo
+# Generate an SSH key if needed
+ssh-keygen -t ed25519
+# Generate a password hash
+mkpasswd --method yescrypt
 
-# Clean generated files
-make clean
+nano .env            # fill in real values
+cd ../.. && make nuc26
+```
 
-# Show help
+Building substitutes the variables, merges the snippets, and transpiles the result to
+`servers/nuc26/nuc26.ign`.
+
+```sh
+make                 # build all servers
+make nuc26           # build one (also: make servers/nuc26/)
+make clean           # remove generated files
 make help
 ```
 
-Building will:
-1. Substitute variables from `.env` into the `*.butane.template` file
-2. Generate a `.butane` config file
-3. Transpile the `.butane` file into an ignition `.ign` config
+If a variable is missing from `.env`, the build stops and tells you which one.
 
-### Deploying
+### Add a server
 
-The generated `.ign` file can be used to provision your server. Manual example:
+1. `mkdir servers/<name>`
+2. Write `server.yaml`: the snippets you want, plus `variant` / `version`
+3. Write `.env.example` covering every variable those snippets require, copy it to `.env`
+4. `make <name>` — no Makefile edit needed, servers are discovered automatically
 
-1. Copy the `provisioning-config.ign` file to a FAT32 formatted USB stick.
+### Add a snippet
+
+See [CLAUDE.md](./CLAUDE.md#writing-a-snippet) for the conventions.
+
+## Deploying
+
+1. Copy the generated `.ign` file to a FAT32 formatted USB stick.
 1. Connect that stick and a Fedora CoreOS live USB stick (created from the downloaded ISO image) to the target device.
-1  Boot the target device from the live USB stick.
+1. Boot the target device from the live USB stick.
 1. Once in the console, run:
    ```sh
    # look what we have
@@ -102,22 +90,32 @@ The generated `.ign` file can be used to provision your server. Manual example:
    # mount the stick with the .ign config
    sudo mount /dev/sdc1 /mnt
    # install FCOS using the .ign config
-   sudo coreos-installer install /dev/sda --ignition-file /mnt/provisioning-config.ign
+   sudo coreos-installer install /dev/sda --ignition-file /mnt/nuc26.ign
    ```
 1. Wait for installation to finish. Shutdown, remove USB sticks.
 1. Boot -> the ignition config will be applied on first boot.
 1. Login as user `core` with the provisioned password or SSH pubkey.
 
-## Adding new servers
+## nuc26: WireGuard VPN gateway
 
-1. Create a new subdirectory for your server
-2. Add a `*.butane.template` file with `${VARIABLE}` placeholders
-3. Create a `.env.example` with all required variables
-4. Add build target to `Makefile`
-5. Follow the usage steps above
+* Static WireGuard endpoint in the LAN, with a webadmin for client config management.
+* Simple, efficient and free alternative to corporate VPN server solutions.
+
+Notes
+
+* WireGuard listens on UDP port 51820 for incoming road warrior connections
+  * Set up port forwarding: firewall WAN port 51820 -> nuc26 LAN IP address, port 51820
+* The wg-easy webadmin listens on the nuc26 LAN IP address, port 8443 — don't expose this to the WAN
+  * `https://<nuc26-ip>:8443`
+  * TLS is terminated by a `caddy` reverse proxy with a self-signed cert; wg-easy's own webadmin
+    port is published to localhost only, and port 51821 redirects to the secure port
+* After initial setup, open the webadmin and
+  * run the config steps
+  * Change the default legacy `iptables`-based **PostUp** and **PostDown** hooks to `nftables`, see [wg-easy documentation](https://wg-easy.github.io/wg-easy/latest/examples/tutorials/podman-nft/#edit-hooks)
+  * Reboot -> ready for setting up road warrior client configs.
 
 ## Security
 
-- **Never commit `.env` files** - they contain secrets
-- Generated `.butane` and `.ign` files are also gitignored since they contain substituted secrets
-- Only commit `.butane.template` and `.env.example` files
+- **Never commit `.env` files** — they contain secrets
+- Generated `.butane`, `.ign` and `.build/` are gitignored too, since they contain substituted secrets
+- Only commit `server.yaml`, `snippet.yaml`, `defaults.env`, `files/` and `.env.example`

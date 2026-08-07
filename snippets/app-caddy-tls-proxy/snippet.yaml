@@ -1,0 +1,26 @@
+# app-caddy-tls-proxy - caddy on the host network, terminating TLS for a
+# localhost-only upstream with a self-signed ("tls internal") certificate.
+#
+# Required vars: IPV4_ADDRESS
+# Optional vars: CADDY_IMAGE, CADDY_TLS_PORT, CADDY_UPSTREAM,
+#                CADDY_REDIRECT_PORT (see defaults.env)
+#
+# The Caddyfile also redirects the upstream's own plain-HTTP port to the TLS
+# port, so bookmarks to the unencrypted URL keep working. A server that wants
+# a different Caddyfile can shadow it with its own
+# servers/<name>/files/etc/containers/volumes/caddy-config/Caddyfile
+storage:
+  directories:
+    - path: /etc/containers/volumes/caddy-config
+      mode: 0700
+    - path: /etc/containers/volumes/caddy-data
+      mode: 0700
+  files:
+    - path: /etc/containers/volumes/caddy-config/Caddyfile
+      mode: 0644
+      contents:
+        local: etc/containers/volumes/caddy-config/Caddyfile
+    - path: /etc/containers/systemd/caddy.container
+      mode: 0644
+      contents:
+        local: etc/containers/systemd/caddy.container

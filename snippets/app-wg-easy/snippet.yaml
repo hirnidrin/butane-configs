@@ -1,0 +1,30 @@
+# app-wg-easy - wg-easy WireGuard VPN engine as a system quadlet
+#
+# Optional vars: WG_EASY_IMAGE, WG_PORT, WG_EASY_UI_LOCAL_PORT (see defaults.env)
+#
+# The webadmin port is published to localhost only - pair this snippet with
+# app-caddy-tls-proxy, which terminates TLS and proxies to it. Without that
+# proxy the web UI is unreachable from anywhere but the host itself.
+#
+# After first boot, follow the wg-easy setup wizard and switch the PostUp /
+# PostDown hooks from iptables to nftables - see README.
+storage:
+  directories:
+    - path: /etc/containers/volumes/wg-easy
+      mode: 0700
+  files:
+    # kernel modules needed by the WireGuard datapath and its NAT rules
+    - path: /etc/modules-load.d/wg-easy.conf
+      mode: 0644
+      contents:
+        inline: |
+          wireguard
+          nft_masq
+    - path: /etc/containers/systemd/wg-easy.network
+      mode: 0644
+      contents:
+        local: etc/containers/systemd/wg-easy.network
+    - path: /etc/containers/systemd/wg-easy.container
+      mode: 0644
+      contents:
+        local: etc/containers/systemd/wg-easy.container

@@ -1,0 +1,13 @@
+# base-core-user - provision the default 'core' user
+#
+# Required vars: SSH_PUBKEY, PASSWORD_HASH
+#   SSH_PUBKEY     public key, e.g. output of `ssh-keygen -t ed25519`
+#   PASSWORD_HASH  yescrypt hash, e.g. output of `mkpasswd --method yescrypt`
+#
+# Almost every server wants this snippet.
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - ${SSH_PUBKEY}
+      password_hash: ${PASSWORD_HASH}

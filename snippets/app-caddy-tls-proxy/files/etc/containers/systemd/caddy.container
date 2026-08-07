@@ -1,0 +1,21 @@
+[Unit]
+Description=Caddy Reverse Proxy (Host Network)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+ContainerName=caddy
+Image=${CADDY_IMAGE}
+AutoUpdate=registry
+
+# Attaches the container directly to the host network stack
+Network=host
+
+Volume=/etc/containers/volumes/caddy-config/Caddyfile:/etc/caddy/Caddyfile:Z
+Volume=/etc/containers/volumes/caddy-data:/data:Z
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

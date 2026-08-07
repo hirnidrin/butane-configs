@@ -1,0 +1,21 @@
+# hw-ipmi-fans - pin IPMI fan speeds on Supermicro-style BMCs after every boot
+#
+# Optional vars: IPMI_FAN_CPU_DUTY, IPMI_FAN_PERIPHERAL_DUTY (see defaults.env)
+#
+# Harvested from the retired wucore-quader config. Unlike there, this runs on
+# every boot and is not sequenced behind any flag file: the BMC forgets the
+# manual fan mode across power cycles, so there is nothing to track.
+#
+# Needs `ipmitool` in the image - it is present in ucore/brucore/wucore, but
+# NOT in stock Fedora CoreOS. On plain FCOS, layer it first.
+storage:
+  files:
+    - path: /usr/local/bin/set-fanspeeds.sh
+      mode: 0755
+      contents:
+        local: usr/local/bin/set-fanspeeds.sh
+systemd:
+  units:
+    - name: fanspeed.service
+      enabled: true
+      contents_local: units/fanspeed.service

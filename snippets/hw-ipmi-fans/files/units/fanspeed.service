@@ -1,0 +1,10 @@
+[Unit]
+Description=Set IPMI fan speeds after each boot
+
+[Service]
+Type=oneshot
+StandardOutput=journal+console
+ExecStart=/usr/local/bin/set-fanspeeds.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+# net-static-ip - static IPv4 address on a single ethernet interface, IPv6 off
+#
+# Required vars: IPV4_ADDRESS, IPV4_SUBNET_LENGTH, IPV4_GATEWAY, IPV4_DNS
+# Optional vars: NET_IFACE (see defaults.env)
+#
+# The connection is written as a NetworkManager keyfile. NM only accepts
+# keyfiles with mode 0600, hence the explicit mode.
+storage:
+  files:
+    - path: /etc/NetworkManager/system-connections/static-${NET_IFACE}.nmconnection
+      mode: 0600
+      contents:
+        inline: |
+          [connection]
+          id=static-${NET_IFACE}
+          type=ethernet
+          interface-name=${NET_IFACE}
+
+          [ipv4]
+          method=manual
+          address1=${IPV4_ADDRESS}/${IPV4_SUBNET_LENGTH}
+          gateway=${IPV4_GATEWAY}
+          dns=${IPV4_DNS};
+
+          [ipv6]
+          method=disabled
