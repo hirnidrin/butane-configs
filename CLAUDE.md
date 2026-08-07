@@ -23,6 +23,7 @@ snippets/<snippet>/snippet.yaml    partial Butane config (the reusable unit)
 snippets/<snippet>/defaults.env    optional default values for its variables
 snippets/<snippet>/files/…         optional payload files (quadlets, scripts, units)
 servers/<name>/server.yaml         snippet list + frame (variant, version, overrides)
+servers/<name>/README.md           what this machine is, plus its post-install steps
 servers/<name>/.env.example        every variable the server must supply (committed)
 servers/<name>/.env                real values (gitignored)
 servers/<name>/files/…             optional per-server overrides of snippet payload files
@@ -45,6 +46,15 @@ Pipeline per server: snippet `defaults.env` + server `.env` → snippet fragment
 
 Inspect `servers/<name>/.build/merged.yaml` and `servers/<name>/<name>.butane` when debugging a
 build — they are the pre- and post-substitution intermediates.
+
+## Adding a server
+
+1. `mkdir servers/<name>` — named after the machine, never after its base image.
+2. `server.yaml`: the snippet list plus the frame (`variant`, `version`, any overrides).
+3. `.env.example` covering every variable those snippets require but do not default.
+4. `README.md` describing the machine and its post-install steps, linked from the servers
+   table in the repo README.
+5. `make <name>` to verify. The Makefile discovers servers by wildcard, so it needs no edit.
 
 ## Writing a snippet
 

@@ -10,7 +10,7 @@ addresses, and `make <name>` produces the Ignition config.
 
 | Server | Base | What it does |
 |--------|------|--------------|
-| `nuc26` | plain FCOS (no rebase) | WireGuard VPN gateway — wg-easy + caddy TLS proxy |
+| [`nuc26`](./servers/nuc26/README.md) | plain FCOS (no rebase) | WireGuard VPN gateway — wg-easy + caddy TLS proxy |
 
 ## Snippets
 
@@ -34,6 +34,7 @@ snippets/<snippet>/snippet.yaml    partial Butane config
 snippets/<snippet>/defaults.env    default values for its optional variables
 snippets/<snippet>/files/…         payload files: quadlets, scripts, systemd units
 servers/<name>/server.yaml         snippet list + frame (variant, version, overrides)
+servers/<name>/README.md           what this machine is and its post-install steps
 servers/<name>/.env.example        variables the server must supply (committed)
 servers/<name>/.env                real values (gitignored)
 servers/<name>/files/…             optional per-server overrides of snippet payloads
@@ -72,7 +73,8 @@ If a variable is missing from `.env`, the build stops and tells you which one.
 1. `mkdir servers/<name>`
 2. Write `server.yaml`: the snippets you want, plus `variant` / `version`
 3. Write `.env.example` covering every variable those snippets require, copy it to `.env`
-4. `make <name>` — no Makefile edit needed, servers are discovered automatically
+4. Write a `README.md` describing the machine, and link it from the servers table above
+5. `make <name>` — no Makefile edit needed, servers are discovered automatically
 
 ### Add a snippet
 
@@ -95,24 +97,6 @@ See [CLAUDE.md](./CLAUDE.md#writing-a-snippet) for the conventions.
 1. Wait for installation to finish. Shutdown, remove USB sticks.
 1. Boot -> the ignition config will be applied on first boot.
 1. Login as user `core` with the provisioned password or SSH pubkey.
-
-## nuc26: WireGuard VPN gateway
-
-* Static WireGuard endpoint in the LAN, with a webadmin for client config management.
-* Simple, efficient and free alternative to corporate VPN server solutions.
-
-Notes
-
-* WireGuard listens on UDP port 51820 for incoming road warrior connections
-  * Set up port forwarding: firewall WAN port 51820 -> nuc26 LAN IP address, port 51820
-* The wg-easy webadmin listens on the nuc26 LAN IP address, port 8443 — don't expose this to the WAN
-  * `https://<nuc26-ip>:8443`
-  * TLS is terminated by a `caddy` reverse proxy with a self-signed cert; wg-easy's own webadmin
-    port is published to localhost only, and port 51821 redirects to the secure port
-* After initial setup, open the webadmin and
-  * run the config steps
-  * Change the default legacy `iptables`-based **PostUp** and **PostDown** hooks to `nftables`, see [wg-easy documentation](https://wg-easy.github.io/wg-easy/latest/examples/tutorials/podman-nft/#edit-hooks)
-  * Reboot -> ready for setting up road warrior client configs.
 
 ## Security
 
