@@ -59,10 +59,9 @@ Building substitutes the variables, merges the snippets, and transpiles the resu
 `servers/nuc26/nuc26.ign`.
 
 ```sh
-make                 # build all servers
-make nuc26           # build one (also: make servers/nuc26/)
+make                 # show help and the list of known servers
+make nuc26           # build one server (also: make servers/nuc26/)
 make clean           # remove generated files
-make help
 ```
 
 If a variable is missing from `.env`, the build stops and tells you which one.

@@ -33,7 +33,7 @@ servers/<name>/.build/             staging: merged.yaml + substituted payloads (
 ## Build commands
 
 ```sh
-make              # build every server
+make              # list targets and known servers (default goal)
 make nuc26        # build one server (also: make servers/nuc26, make servers/nuc26/)
 ./build.sh nuc26  # same thing without make
 make clean
