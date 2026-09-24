@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# zfs-autosnap - take one recursive snapshot of a dataset tree and prune old ones
+#
+#   zfs-autosnap hourly|daily|weekly
+#
+# Config, sourced from ZFS_AUTOSNAP_CONF (default /etc/zfs-autosnap.conf):
+#   AUTOSNAP_DATASET       root of the tree, e.g. tank/projects
+#   AUTOSNAP_KEEP_HOURLY   how many snapshots of each class to keep, >= 1
+#   AUTOSNAP_KEEP_DAILY
+#   AUTOSNAP_KEEP_WEEKLY
+#
+# Snapshots are named <dataset>@autosnap-<class>-<UTC timestamp>. Only those
+# are pruned, oldest first, and each is destroyed with -r because it was taken
+# with -r. Manual snapshots are never touched. Usage and config are validated
+# before the first zfs call: a bad config takes no snapshot and deletes nothing.
+#
+set -euo pipefail
+
+die() {
+	echo "zfs-autosnap: $*" >&2
+	exit 2
+}
+
+[ $# -eq 1 ] || die "usage: zfs-autosnap hourly|daily|weekly"
+class="$1"
+case "$class" in
+hourly) keep_var=AUTOSNAP_KEEP_HOURLY ;;
+daily) keep_var=AUTOSNAP_KEEP_DAILY ;;
+weekly) keep_var=AUTOSNAP_KEEP_WEEKLY ;;
+*) die "unknown class '$class'" ;;
+esac
+
+conf="${ZFS_AUTOSNAP_CONF:-/etc/zfs-autosnap.conf}"
+[ -r "$conf" ] || die "cannot read $conf"
+# shellcheck disable=SC1090
+. "$conf"
+
+dataset="${AUTOSNAP_DATASET:-}"
+keep="${!keep_var:-}"
+[[ "$dataset" =~ ^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$ ]] || die "bad AUTOSNAP_DATASET '$dataset'"
+[[ "$keep" =~ ^[1-9][0-9]*$ ]] || die "bad $keep_var '$keep'"
+
+prefix="$dataset@autosnap-$class-"
+zfs snapshot -r "$prefix$(date -u +%Y%m%dT%H%MZ)"
+
+zfs list -H -t snapshot -o name -s creation -d 1 "$dataset" |
+	{ grep -F "$prefix" || true; } |
+	head -n "-$keep" |
+	while read -r snap; do
+		zfs destroy -r "$snap"
+	done

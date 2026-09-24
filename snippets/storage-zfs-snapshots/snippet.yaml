@@ -1,0 +1,31 @@
+# storage-zfs-snapshots - hourly/daily/weekly recursive snapshots of one
+# dataset tree, with pruning
+#
+# Optional vars: AUTOSNAP_DATASET, AUTOSNAP_KEEP_HOURLY, AUTOSNAP_KEEP_DAILY,
+#                AUTOSNAP_KEEP_WEEKLY (see defaults.env)
+#
+# Plain ZFS on the host, independent of anything running on top, so
+# snapshots keep being taken when the workloads are broken. Needs
+# storage-zfs-import. Missed runs (host down) are caught up at boot.
+storage:
+  files:
+    - path: /opt/bin/zfs-autosnap
+      mode: 0755
+      contents:
+        local: opt/bin/zfs-autosnap
+    - path: /etc/zfs-autosnap.conf
+      mode: 0644
+      contents:
+        local: etc/zfs-autosnap.conf
+systemd:
+  units:
+    - name: zfs-autosnap@.service
+      contents_local: units/zfs-autosnap@.service
+    - name: zfs-autosnap@.timer
+      contents_local: units/zfs-autosnap@.timer
+    - name: zfs-autosnap@hourly.timer
+      enabled: true
+    - name: zfs-autosnap@daily.timer
+      enabled: true
+    - name: zfs-autosnap@weekly.timer
+      enabled: true

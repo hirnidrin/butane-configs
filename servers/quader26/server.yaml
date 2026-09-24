@@ -13,6 +13,7 @@ snippets:
   - sysext-ipmitool
   - hw-ipmi-fans
   - storage-zfs-import
+  - storage-zfs-snapshots
 
 # --- frame -------------------------------------------------------------------
 # Merged last, so anything added here wins over the snippets above.

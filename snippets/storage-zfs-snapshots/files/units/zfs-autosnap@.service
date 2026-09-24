@@ -1,0 +1,8 @@
+[Unit]
+Description=ZFS %i snapshot
+Requires=zfs-mount.service
+After=zfs-mount.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bin/zfs-autosnap %i

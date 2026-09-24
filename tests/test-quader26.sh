@@ -48,4 +48,18 @@ check "pools found by scan on a fresh /etc" test \
 	"$(ign_link "$ign" /etc/systemd/system/zfs-import.target.wants/zfs-import-scan.service)" = /usr/lib/systemd/system/zfs-import-scan.service
 check "Ignition never touches disks" jqe '(.storage.disks // []) == [] and (.storage.filesystems // []) == []' "$ign"
 
+# --- snapshots ----------------------------------------------------------------
+snapconf="$(ign_file "$ign" /etc/zfs-autosnap.conf)"
+check "snapshots: dataset" contains "$snapconf" "AUTOSNAP_DATASET=tank/projects"
+check "snapshots: keep 24 hourly" contains "$snapconf" "AUTOSNAP_KEEP_HOURLY=24"
+check "snapshots: keep 14 daily" contains "$snapconf" "AUTOSNAP_KEEP_DAILY=14"
+check "snapshots: keep 8 weekly" contains "$snapconf" "AUTOSNAP_KEEP_WEEKLY=8"
+check "snapshots: script installed executable" jqe '.storage.files[] | select(.path == "/opt/bin/zfs-autosnap") | .mode == 493' "$ign"
+snapsvc="$(ign_unit "$ign" zfs-autosnap@.service)"
+check "snapshots: service requires zfs-mount" contains "$snapsvc" "Requires=zfs-mount.service"
+check "snapshots: timer fires on its class" contains "$(ign_unit "$ign" zfs-autosnap@.timer)" "OnCalendar=%i"
+for c in hourly daily weekly; do
+	check "snapshots: $c timer enabled" ign_unit_enabled "$ign" "zfs-autosnap@$c.timer"
+done
+
 finish

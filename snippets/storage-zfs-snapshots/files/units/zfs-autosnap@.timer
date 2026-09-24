@@ -1,0 +1,10 @@
+[Unit]
+Description=ZFS %i snapshot
+
+[Timer]
+# The instance name is the calendar shorthand: hourly, daily, weekly.
+OnCalendar=%i
+Persistent=true
+
+[Install]
+WantedBy=timers.target
