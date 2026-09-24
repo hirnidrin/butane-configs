@@ -42,4 +42,10 @@ check "fanspeed.service enabled" ign_unit_enabled "$ign" fanspeed.service
 check "fanspeed runs after sysexts are merged" contains "$fanunit" "After=systemd-sysext.service systemd-modules-load.service"
 check "fanspeed calls /opt/bin" contains "$fanunit" "ExecStart=/opt/bin/set-fanspeeds.sh"
 
+# --- zfs ----------------------------------------------------------------------
+check "zfs sysext enabled" test "$(ign_file "$ign" /etc/flatcar/enabled-sysext.conf)" = zfs
+check "pools found by scan on a fresh /etc" test \
+	"$(ign_link "$ign" /etc/systemd/system/zfs-import.target.wants/zfs-import-scan.service)" = /usr/lib/systemd/system/zfs-import-scan.service
+check "Ignition never touches disks" jqe '(.storage.disks // []) == [] and (.storage.filesystems // []) == []' "$ign"
+
 finish

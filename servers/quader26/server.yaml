@@ -12,6 +12,7 @@ snippets:
   - base-flatcar-no-docker
   - sysext-ipmitool
   - hw-ipmi-fans
+  - storage-zfs-import
 
 # --- frame -------------------------------------------------------------------
 # Merged last, so anything added here wins over the snippets above.

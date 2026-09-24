@@ -1,0 +1,27 @@
+# storage-zfs-import - enable Flatcar's ZFS sysext and import existing pools at boot
+#
+# No vars.
+#
+# The official zfs sysext is built by Flatcar CI for each release and rides
+# the A/B update. Its preset enables zfs-import-cache and zfs-mount, but the
+# cache file lives in /etc, which a reprovision starts fresh. So
+# zfs-import-scan is enabled too: it only runs when there is no cache file
+# and imports every pool it finds.
+#
+# Pool creation is deliberately NOT here. Ignition never touches the data
+# disks; creating the pool is a one-time manual step (see the server README).
+#
+# If an update ever ships without a working ZFS module, the pool stays
+# unimported: the host still boots and SSH works; services that require the
+# pool must refuse to start (see app-k3s-server).
+storage:
+  files:
+    - path: /etc/flatcar/enabled-sysext.conf
+      mode: 0644
+      contents:
+        inline: |
+          zfs
+  links:
+    - path: /etc/systemd/system/zfs-import.target.wants/zfs-import-scan.service
+      target: /usr/lib/systemd/system/zfs-import-scan.service
+      hard: false
