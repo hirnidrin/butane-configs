@@ -46,6 +46,8 @@ check "fanspeed calls /opt/bin" contains "$fanunit" "ExecStart=/opt/bin/set-fans
 check "zfs sysext enabled" test "$(ign_file "$ign" /etc/flatcar/enabled-sysext.conf)" = zfs
 check "pools found by scan on a fresh /etc" test \
 	"$(ign_link "$ign" /etc/systemd/system/zfs-import.target.wants/zfs-import-scan.service)" = /usr/lib/systemd/system/zfs-import-scan.service
+check "zfs udevd drop-in masked (flatcar/Flatcar#2422 boot deadlock)" test \
+	"$(ign_link "$ign" /etc/systemd/system/systemd-udevd.service.d/10-zfs.conf)" = /dev/null
 check "Ignition never touches disks" jqe '(.storage.disks // []) == [] and (.storage.filesystems // []) == []' "$ign"
 
 # --- snapshots ----------------------------------------------------------------

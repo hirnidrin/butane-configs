@@ -11,6 +11,13 @@
 # Pool creation is deliberately NOT here. Ignition never touches the data
 # disks; creating the pool is a one-time manual step (see the server README).
 #
+# The zfs sysext copies a drop-in into /etc that orders systemd-udevd after
+# systemd-sysext. On Flatcar 4757.2.0 that deadlocks the boot: udevd waits
+# for the merge, the merge waits for devices only udevd can create
+# (flatcar/Flatcar#2422). Masking the drop-in with a /dev/null link is the
+# upstream workaround; tmpfiles only copies it when the path is free, so the
+# link wins. Remove the mask once Flatcar ships a fix.
+#
 # If an update ever ships without a working ZFS module, the pool stays
 # unimported: the host still boots and SSH works; services that require the
 # pool must refuse to start (see app-k3s-server).
@@ -25,3 +32,7 @@ storage:
     - path: /etc/systemd/system/zfs-import.target.wants/zfs-import-scan.service
       target: /usr/lib/systemd/system/zfs-import-scan.service
       hard: false
+    - path: /etc/systemd/system/systemd-udevd.service.d/10-zfs.conf
+      target: /dev/null
+      hard: false
+      overwrite: true
