@@ -6,14 +6,17 @@
 # every boot and is not sequenced behind any flag file: the BMC forgets the
 # manual fan mode across power cycles, so there is nothing to track.
 #
-# Needs `ipmitool` in the image - it is present in ucore/brucore/wucore, but
-# NOT in stock Fedora CoreOS. On plain FCOS, layer it first.
+# Needs `ipmitool` and the OpenIPMI modules: on Flatcar add the
+# sysext-ipmitool snippet; on stock FCOS, layer ipmitool first.
+#
+# The script lives in /opt/bin: /usr is read-only on Flatcar, and /opt is
+# writable on both Flatcar and FCOS.
 storage:
   files:
-    - path: /usr/local/bin/set-fanspeeds.sh
+    - path: /opt/bin/set-fanspeeds.sh
       mode: 0755
       contents:
-        local: usr/local/bin/set-fanspeeds.sh
+        local: opt/bin/set-fanspeeds.sh
 systemd:
   units:
     - name: fanspeed.service

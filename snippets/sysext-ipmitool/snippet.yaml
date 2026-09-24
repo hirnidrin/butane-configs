@@ -1,0 +1,26 @@
+# sysext-ipmitool - static ipmitool from hirnidrin/sysext-bakery, plus the
+# OpenIPMI kernel modules for talking to the local BMC
+#
+# Optional vars: IPMITOOL_VERSION, IPMITOOL_SHA256 (see defaults.env)
+#
+# The image is downloaded once at provisioning and verified against the
+# pinned hash. No systemd-sysupdate: a new version is a change to the two
+# variables and a reprovision.
+storage:
+  files:
+    - path: /opt/extensions/ipmitool/ipmitool-${IPMITOOL_VERSION}-x86-64.raw
+      mode: 0644
+      contents:
+        source: https://github.com/hirnidrin/sysext-bakery/releases/download/ipmitool-${IPMITOOL_VERSION}/ipmitool-${IPMITOOL_VERSION}-x86-64.raw
+        verification:
+          hash: sha256-${IPMITOOL_SHA256}
+    - path: /etc/modules-load.d/ipmi.conf
+      mode: 0644
+      contents:
+        inline: |
+          ipmi_devintf
+          ipmi_si
+  links:
+    - path: /etc/extensions/ipmitool.raw
+      target: /opt/extensions/ipmitool/ipmitool-${IPMITOOL_VERSION}-x86-64.raw
+      hard: false

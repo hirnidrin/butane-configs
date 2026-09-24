@@ -10,6 +10,8 @@ snippets:
   - net-static-ip-networkd
   - base-flatcar-updates
   - base-flatcar-no-docker
+  - sysext-ipmitool
+  - hw-ipmi-fans
 
 # --- frame -------------------------------------------------------------------
 # Merged last, so anything added here wins over the snippets above.

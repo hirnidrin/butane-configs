@@ -1,10 +1,13 @@
 [Unit]
 Description=Set IPMI fan speeds after each boot
+# ipmitool comes from a sysext and talks to /dev/ipmi0 via the OpenIPMI
+# modules, so wait for both.
+After=systemd-sysext.service systemd-modules-load.service
 
 [Service]
 Type=oneshot
 StandardOutput=journal+console
-ExecStart=/usr/local/bin/set-fanspeeds.sh
+ExecStart=/opt/bin/set-fanspeeds.sh
 
 [Install]
 WantedBy=multi-user.target

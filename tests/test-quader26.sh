@@ -27,4 +27,19 @@ check "updates: window length" contains "$upd" "LOCKSMITHD_REBOOT_WINDOW_LENGTH=
 check "docker-flatcar sysext disabled" test "$(ign_link "$ign" /etc/extensions/docker-flatcar.raw)" = /dev/null
 check "containerd-flatcar sysext disabled" test "$(ign_link "$ign" /etc/extensions/containerd-flatcar.raw)" = /dev/null
 
+# --- fans ---------------------------------------------------------------------
+check "ipmitool sysext pinned by hash" test "$(ign_remote "$ign" /opt/extensions/ipmitool/ipmitool-1.8.19-x86-64.raw)" = \
+	"https://github.com/hirnidrin/sysext-bakery/releases/download/ipmitool-1.8.19/ipmitool-1.8.19-x86-64.raw sha256-dd8a382ffa281566ff89ae9edd16f3149a3efbb97c943b7c7f3d98a0ef423e38"
+check "ipmitool sysext merged" test "$(ign_link "$ign" /etc/extensions/ipmitool.raw)" = /opt/extensions/ipmitool/ipmitool-1.8.19-x86-64.raw
+mods="$(ign_file "$ign" /etc/modules-load.d/ipmi.conf)"
+check "ipmi_devintf loaded at boot" contains "$mods" ipmi_devintf
+check "ipmi_si loaded at boot" contains "$mods" ipmi_si
+fans="$(ign_file "$ign" /opt/bin/set-fanspeeds.sh)"
+check "fan script in /opt/bin with duty substituted" contains "$fans" "0x70 0x66 0x01 0x00 0x2A"
+check "nothing written under read-only /usr" test -z "$(jq -r '.storage.files[].path | select(startswith("/usr/"))' "$ign")"
+fanunit="$(ign_unit "$ign" fanspeed.service)"
+check "fanspeed.service enabled" ign_unit_enabled "$ign" fanspeed.service
+check "fanspeed runs after sysexts are merged" contains "$fanunit" "After=systemd-sysext.service systemd-modules-load.service"
+check "fanspeed calls /opt/bin" contains "$fanunit" "ExecStart=/opt/bin/set-fanspeeds.sh"
+
 finish
