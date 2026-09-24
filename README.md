@@ -1,6 +1,6 @@
 # Butane Configs
 
-Butane/Ignition provisioning configs for Fedora CoreOS based servers.
+Butane/Ignition provisioning configs for Fedora CoreOS and Flatcar Container Linux servers.
 
 Each server is composed from reusable snippets rather than written as one monolithic template:
 `servers/<name>/server.yaml` lists the snippets it wants, `.env` supplies the secrets and
@@ -11,18 +11,26 @@ addresses, and `make <name>` produces the Ignition config.
 | Server | Base | What it does |
 |--------|------|--------------|
 | [`nuc26`](./servers/nuc26/README.md) | plain FCOS (no rebase) | WireGuard VPN gateway — wg-easy + caddy TLS proxy |
+| [`quader26`](./servers/quader26/README.md) | Flatcar | homelab host: ZFS mirror + single-node k3s |
 
 ## Snippets
 
-| Snippet | Purpose |
-|---------|---------|
-| `base-core-user` | `core` user with SSH key and password hash |
-| `base-hostname` | static hostname |
-| `net-static-ip` | static IPv4 on one ethernet interface, IPv6 disabled |
-| `storage-btrfs-raid1` | two NVMe devices mirrored into one btrfs RAID1, mounted at boot |
-| `app-wg-easy` | wg-easy WireGuard engine + webadmin, as a system quadlet |
-| `app-caddy-tls-proxy` | caddy on the host network, TLS for a localhost-only upstream |
-| `hw-ipmi-fans` | pin IPMI fan duty cycles on every boot (needs `ipmitool` in the image) |
+| Snippet | Variant | Purpose |
+|---------|---------|---------|
+| `base-core-user` | any | `core` user with SSH key and password hash |
+| `base-hostname` | any | static hostname |
+| `base-flatcar-updates` | Flatcar | automatic updates, reboots in a weekly window |
+| `base-flatcar-no-docker` | Flatcar | disable the bundled docker and containerd sysexts |
+| `net-static-ip` | FCOS | static IPv4 on one ethernet interface, IPv6 disabled (NetworkManager) |
+| `net-static-ip-networkd` | Flatcar | static IPv4 on one ethernet interface, IPv6 disabled (systemd-networkd) |
+| `storage-btrfs-raid1` | any | two NVMe devices mirrored into one btrfs RAID1, mounted at boot |
+| `storage-zfs-import` | Flatcar | ZFS sysext; import existing pools at boot (never creates one) |
+| `storage-zfs-snapshots` | any | hourly/daily/weekly recursive snapshots with pruning |
+| `sysext-ipmitool` | Flatcar | hash-pinned ipmitool sysext + OpenIPMI modules |
+| `hw-ipmi-fans` | any | pin IPMI fan duty cycles on every boot (needs `ipmitool`: `sysext-ipmitool` on Flatcar) |
+| `app-wg-easy` | FCOS | wg-easy WireGuard engine + webadmin, as a system quadlet (Podman) |
+| `app-caddy-tls-proxy` | FCOS | caddy on the host network, TLS for a localhost-only upstream (Podman) |
+| `app-k3s-server` | Flatcar | pinned single-node k3s that refuses to start without its ZFS dataset |
 
 Each snippet documents its variables in the comment block at the top of its `snippet.yaml`, and
 ships defaults for the optional ones in `defaults.env`.
@@ -38,6 +46,7 @@ servers/<name>/README.md           what this machine is and its post-install ste
 servers/<name>/.env.example        variables the server must supply (committed)
 servers/<name>/.env                real values (gitignored)
 servers/<name>/files/…             optional per-server overrides of snippet payloads
+tests/                             build checks: make test
 ```
 
 ## Usage
@@ -64,6 +73,7 @@ Building substitutes the variables, merges the snippets, and transpiles the resu
 make                 # show help and the list of known servers
 make nuc26           # build one server (also: make servers/nuc26/)
 make clean           # remove generated files
+make test            # build every server from .env.example and run the checks
 ```
 
 If a variable is missing from `.env`, the build stops and tells you which one.
@@ -81,6 +91,8 @@ If a variable is missing from `.env`, the build stops and tells you which one.
 See [CLAUDE.md](./CLAUDE.md#writing-a-snippet) for the conventions.
 
 ## Deploying
+
+FCOS servers, as below. Flatcar servers: see the server's own README (IPMI + `flatcar-install`).
 
 1. Copy the generated `.ign` file to a FAT32 formatted USB stick.
 1. Connect that stick and a Fedora CoreOS live USB stick (created from the downloaded ISO image) to the target device.

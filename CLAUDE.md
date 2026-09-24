@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This repo manages Butane/Ignition provisioning configs for Fedora CoreOS (FCOS) based servers.
+This repo manages Butane/Ignition provisioning configs for Fedora CoreOS (FCOS) and Flatcar Container Linux servers.
 
 A server is **composed**, not written from scratch: `servers/<name>/server.yaml` names a list
 of reusable snippets from `snippets/` and adds a small frame of its own. `build.sh` deep-merges
@@ -14,7 +14,8 @@ transpiles the result into an Ignition `.ign` config.
 Server directories are named after the **real server** (`nuc26`), never after the base image.
 
 **Tools required:** `butane` (transpiler), `yq` (mikefarah/yq v4, YAML merge), `envsubst`
-(variable substitution), `mkpasswd` (password hashing)
+(variable substitution), `mkpasswd` (password hashing); for `make test` also `jq`,
+`shellcheck`, `python3`
 
 ## Layout
 
@@ -38,6 +39,7 @@ make              # list targets and known servers (default goal)
 make nuc26        # build one server (also: make servers/nuc26, make servers/nuc26/)
 ./build.sh nuc26  # same thing without make
 make clean
+make test         # build every server from .env.example into a temp dir and run tests/
 ```
 
 Pipeline per server: snippet `defaults.env` + server `.env` → snippet fragments + frame
@@ -71,6 +73,15 @@ build — they are the pre- and post-substitution intermediates.
 6. Never write a literal `${...}` in a snippet comment or payload unless it is a real variable —
    the build fails on any placeholder left unsubstituted. That check is what catches a variable
    missing from `.env`, so keep it noise-free.
+
+7. State the variant in the header comment if the snippet only works on one
+   (e.g. networkd vs NetworkManager), and in the README's Variant column.
+8. Flatcar's `/usr` is read-only (sysexts overlay it, `/usr/local` included):
+   host scripts go to `/opt/bin`, which is writable on FCOS too.
+9. Downloaded artifacts (sysexts, binaries) always carry
+   `verification.hash`. Versions and hashes go in `defaults.env`.
+10. Add checks for the snippet to the server's `tests/test-<server>.sh`;
+    scripts with logic get their own `tests/test-<script>.sh`.
 
 Snippets are merged in the order listed, with the frame merged last, so the frame's scalars win.
 Two snippets writing the same file path is an error — `butane --strict` catches it.
