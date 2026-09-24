@@ -13,7 +13,7 @@ FAILS=0
 build_example() {
 	local server="$1" out
 	out="$(mktemp -d)"
-	ENV_FILE="$REPO_ROOT/servers/$server/.env.example" OUT_DIR="$out" \
+	BUTANE_ENV_FILE="$REPO_ROOT/servers/$server/.env.example" BUTANE_OUT_DIR="$out" \
 		"$REPO_ROOT/build.sh" "$server" >/dev/null || return 1
 	echo "$out/$server.ign"
 }

@@ -3,7 +3,7 @@
 # Build the Ignition config for one server out of a frame + reusable snippets.
 #
 #   ./build.sh nuc26            # or: servers/nuc26, servers/nuc26/
-#   ENV_FILE=… OUT_DIR=… ./build.sh nuc26   # build elsewhere (used by tests/)
+#   BUTANE_ENV_FILE=… BUTANE_OUT_DIR=… ./build.sh nuc26   # build elsewhere (tests/)
 #
 # Pipeline:
 #   1. read servers/<name>/server.yaml    - frame + list of snippets
@@ -31,10 +31,12 @@ SERVER="${1%/}"
 SERVER="${SERVER#servers/}"
 SERVER_DIR="$REPO_ROOT/servers/$SERVER"
 MANIFEST="$SERVER_DIR/server.yaml"
-# ENV_FILE and OUT_DIR may be overridden; the tests build from .env.example
-# into a temp dir so they can never clobber a real build.
-ENV_FILE="${ENV_FILE:-$SERVER_DIR/.env}"
-OUT_DIR="${OUT_DIR:-$SERVER_DIR}"
+# BUTANE_ENV_FILE and BUTANE_OUT_DIR may be set by the caller; the tests build
+# from .env.example into a temp dir so they can never clobber a real build.
+# Deliberately not plain ENV_FILE / OUT_DIR: a stray variable of that common
+# name in the caller's shell must never steer a real build.
+ENV_FILE="${BUTANE_ENV_FILE:-$SERVER_DIR/.env}"
+OUT_DIR="${BUTANE_OUT_DIR:-$SERVER_DIR}"
 STAGE="$OUT_DIR/.build"
 BUTANE_OUT="$OUT_DIR/$SERVER.butane"
 IGN_OUT="$OUT_DIR/$SERVER.ign"
