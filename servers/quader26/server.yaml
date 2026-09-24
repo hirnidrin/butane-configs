@@ -14,6 +14,7 @@ snippets:
   - hw-ipmi-fans
   - storage-zfs-import
   - storage-zfs-snapshots
+  - app-k3s-server
 
 # --- frame -------------------------------------------------------------------
 # Merged last, so anything added here wins over the snippets above.

@@ -1,0 +1,10 @@
+# k3s server config, see https://docs.k3s.io/cli/server
+# Written by Ignition from the app-k3s-server snippet: change it there.
+node-ip: ${IPV4_ADDRESS}
+tls-san:
+  - ${HOSTNAME}
+  - ${IPV4_ADDRESS}
+write-kubeconfig-mode: "0600"
+secrets-encryption: true
+disable:
+  - traefik

@@ -62,4 +62,24 @@ for c in hourly daily weekly; do
 	check "snapshots: $c timer enabled" ign_unit_enabled "$ign" "zfs-autosnap@$c.timer"
 done
 
+# --- k3s ----------------------------------------------------------------------
+check "k3s sysext pinned by hash" test "$(ign_remote "$ign" /opt/extensions/k3s/k3s-v1.36.4+k3s1-x86-64.raw)" = \
+	"https://extensions.flatcar.org/extensions/k3s-v1.36.4+k3s1-x86-64.raw sha256-d9d3037fefceaead851f9fbf230db0fe7ab9bea04fd6fd109582835950ee9d9d"
+check "k3s sysext merged" test "$(ign_link "$ign" /etc/extensions/k3s.raw)" = /opt/extensions/k3s/k3s-v1.36.4+k3s1-x86-64.raw
+check "k3s server enabled" test \
+	"$(ign_link "$ign" /etc/systemd/system/multi-user.target.wants/k3s.service)" = /usr/local/lib/systemd/system/k3s.service
+check "no sysupdate for k3s" test -z "$(jq -r '.storage.files[].path | select(contains("sysupdate"))' "$ign")"
+k3sconf="$(ign_file "$ign" /etc/rancher/k3s/config.yaml)"
+check "k3s: node ip" contains "$k3sconf" "node-ip: 192.168.123.123"
+check "k3s: tls san hostname" contains "$k3sconf" "- quader26"
+check "k3s: bundled traefik disabled" contains "$k3sconf" "- traefik"
+check "k3s: secrets encrypted at rest" contains "$k3sconf" "secrets-encryption: true"
+check "k3s: kubeconfig root-only" contains "$k3sconf" 'write-kubeconfig-mode: "0600"'
+check "k3s: config not world-readable" jqe '.storage.files[] | select(.path == "/etc/rancher/k3s/config.yaml") | .mode == 384' "$ign"
+dropin="$(ign_dropin "$ign" k3s.service 10-require-zfs.conf)"
+check "k3s requires zfs-mount" contains "$dropin" "Requires=zfs-mount.service"
+check "k3s ordered after zfs-mount" contains "$dropin" "After=zfs-mount.service"
+check "k3s refuses to start without the containerd dataset" contains "$dropin" \
+	"ExecStartPre=/usr/bin/mountpoint -q /var/lib/rancher/k3s/agent/containerd"
+
 finish

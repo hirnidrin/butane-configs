@@ -1,0 +1,43 @@
+# app-k3s-server - single-node k3s server from the Flatcar sysext-bakery,
+# pinned, refusing to start without its ZFS dataset
+#
+# Required vars: HOSTNAME, IPV4_ADDRESS (shared with base-hostname and
+#                net-static-ip-networkd)
+# Optional vars: K3S_VERSION, K3S_SHA256 (see defaults.env)
+#
+# Deliberately no systemd-sysupdate, unlike the bakery's example: a k3s
+# upgrade is a change to K3S_VERSION/K3S_SHA256 and a reprovision.
+#
+# containerd's store lives on the ZFS dataset tank/system/containerd,
+# mounted at /var/lib/rancher/k3s/agent/containerd, to spare the OS disk.
+# The drop-in stops k3s from ever starting against the bare OS disk: no pool,
+# no k3s. Needs storage-zfs-import.
+#
+# Bundled Traefik is disabled (the ingress is installed and pinned from git);
+# the built-in service load balancer is kept.
+storage:
+  files:
+    - path: /opt/extensions/k3s/k3s-${K3S_VERSION}-x86-64.raw
+      mode: 0644
+      contents:
+        source: https://extensions.flatcar.org/extensions/k3s-${K3S_VERSION}-x86-64.raw
+        verification:
+          hash: sha256-${K3S_SHA256}
+    - path: /etc/rancher/k3s/config.yaml
+      mode: 0600
+      contents:
+        local: etc/rancher/k3s/config.yaml
+  links:
+    - path: /etc/extensions/k3s.raw
+      target: /opt/extensions/k3s/k3s-${K3S_VERSION}-x86-64.raw
+      hard: false
+    - path: /etc/systemd/system/multi-user.target.wants/k3s.service
+      target: /usr/local/lib/systemd/system/k3s.service
+      hard: false
+      overwrite: true
+systemd:
+  units:
+    - name: k3s.service
+      dropins:
+        - name: 10-require-zfs.conf
+          contents_local: units/k3s-require-zfs.conf
