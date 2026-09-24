@@ -4,7 +4,7 @@ SERVERS := $(notdir $(wildcard servers/*))
 # `make servers/nuc26/` - the last one is what shell tab-completion gives you.
 SERVER_TARGETS := $(SERVERS) $(addprefix servers/,$(SERVERS)) $(addsuffix /,$(addprefix servers/,$(SERVERS)))
 
-.PHONY: all clean help $(SERVER_TARGETS)
+.PHONY: all clean help test $(SERVER_TARGETS)
 
 # Bare `make` prints help - building a server is always an explicit choice.
 .DEFAULT_GOAL := help
@@ -14,6 +14,7 @@ help:
 	@echo "  help     - Show this help message (default)"
 	@echo "  all      - Build every server config"
 	@echo "  clean    - Remove all generated files"
+	@echo "  test     - Build every server from .env.example and run the checks"
 	@echo ""
 	@echo "Servers (found in servers/):"
 	@$(foreach s,$(SERVERS),echo "  $(s)";)
@@ -26,6 +27,9 @@ all: $(SERVERS)
 # list as a prerequisite.
 $(SERVER_TARGETS):
 	@./build.sh $@
+
+test:
+	@./tests/run.sh
 
 clean:
 	@echo "Cleaning generated files..."

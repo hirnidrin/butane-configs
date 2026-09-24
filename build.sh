@@ -3,6 +3,7 @@
 # Build the Ignition config for one server out of a frame + reusable snippets.
 #
 #   ./build.sh nuc26            # or: servers/nuc26, servers/nuc26/
+#   ENV_FILE=… OUT_DIR=… ./build.sh nuc26   # build elsewhere (used by tests/)
 #
 # Pipeline:
 #   1. read servers/<name>/server.yaml    - frame + list of snippets
@@ -30,14 +31,17 @@ SERVER="${1%/}"
 SERVER="${SERVER#servers/}"
 SERVER_DIR="$REPO_ROOT/servers/$SERVER"
 MANIFEST="$SERVER_DIR/server.yaml"
-ENV_FILE="$SERVER_DIR/.env"
-STAGE="$SERVER_DIR/.build"
-BUTANE_OUT="$SERVER_DIR/$SERVER.butane"
-IGN_OUT="$SERVER_DIR/$SERVER.ign"
+# ENV_FILE and OUT_DIR may be overridden; the tests build from .env.example
+# into a temp dir so they can never clobber a real build.
+ENV_FILE="${ENV_FILE:-$SERVER_DIR/.env}"
+OUT_DIR="${OUT_DIR:-$SERVER_DIR}"
+STAGE="$OUT_DIR/.build"
+BUTANE_OUT="$OUT_DIR/$SERVER.butane"
+IGN_OUT="$OUT_DIR/$SERVER.ign"
 
 [ -d "$SERVER_DIR" ] || die "no such server: servers/$SERVER"
 [ -f "$MANIFEST" ] || die "missing servers/$SERVER/server.yaml"
-[ -f "$ENV_FILE" ] || die "missing servers/$SERVER/.env - copy .env.example and fill in real values"
+[ -f "$ENV_FILE" ] || die "missing $ENV_FILE - copy .env.example and fill in real values"
 
 # --- 1. snippets ------------------------------------------------------------
 
@@ -69,6 +73,7 @@ set +a
 # Substitute only the names we actually know about, so that ${...} in shell
 # scripts, Caddyfiles and the like survives untouched.
 VAR_NAMES="$(grep -hoE '^[A-Za-z_][A-Za-z0-9_]*=' "${ENV_FILES[@]}" | tr -d '=' | sort -u)"
+# shellcheck disable=SC2016,SC2086 # literal ${NAME} wanted; VAR_NAMES is split on purpose
 SHELL_FORMAT="$(printf '${%s} ' $VAR_NAMES)"
 
 # --- 3. stage payload files -------------------------------------------------
@@ -100,6 +105,7 @@ stage_tree "$SERVER_DIR/files"
 
 # '*+' deep-merges maps and appends arrays, so storage.files / systemd.units
 # from several snippets concatenate. The frame is merged last: its scalars win.
+# shellcheck disable=SC2016 # $item is a yq variable, not a shell one
 yq eval-all '. as $item ireduce ({}; . *+ $item) | del(.snippets)' \
 	"${SNIPPET_YAMLS[@]}" "$MANIFEST" >"$STAGE/merged.yaml"
 
@@ -110,6 +116,7 @@ envsubst "$SHELL_FORMAT" <"$STAGE/merged.yaml" >"$BUTANE_OUT"
 leftovers="$(grep -ohE '\$\{[A-Za-z_][A-Za-z0-9_]*\}' -r "$BUTANE_OUT" "$STAGE/files" | sort -u || true)"
 if [ -n "$leftovers" ]; then
 	echo "error: unsubstituted variables - add them to servers/$SERVER/.env:" >&2
+	# shellcheck disable=SC2001 # indent every line; sed is clearer than a loop
 	echo "$leftovers" | sed 's/^/  /' >&2
 	exit 1
 fi
