@@ -66,16 +66,41 @@ sudo systemctl restart k3s
 already carry a pool, which is the only thing standing between a mistyped
 command and an empty pool.
 
+## Reprovision only: pool not imported?
+
+After a reprovision the pool should be imported automatically
+(`zpool status tank`). If it isn't:
+
+```sh
+sudo zpool import                  # lists pools found on the disks
+sudo zpool import tank
+```
+
+If that refuses with "pool was previously in use from another system", the
+new install has a different host id. Then, and only then:
+
+```sh
+sudo zpool import -f tank
+```
+
+`-f` on **import** of your own pool is safe. `-f` on **create** never is.
+Do not run the first-provision commands on a reprovision.
+
 ## Reprovision only: reset the containerd cache
 
 The containerd store survives on the pool, but the cluster state on the OS
-disk does not. Start containerd clean; it is a cache, not data:
+disk does not. Start containerd clean; it is a cache, not data.
+
+k3s must not run during the reset. Stopping the service is not enough:
+it leaves the container shims running, and their mounts keep the dataset
+busy. So mask k3s and reboot, which leaves nothing running on the dataset:
 
 ```sh
-sudo systemctl stop k3s
+sudo systemctl mask k3s && sudo systemctl reboot
+# after the reboot:
 sudo zfs destroy -r tank/system/containerd
 sudo zfs create -o mountpoint=/var/lib/rancher/k3s/agent/containerd tank/system/containerd
-sudo systemctl start k3s
+sudo systemctl unmask k3s && sudo systemctl start k3s
 ```
 
 `tank/projects` is untouched: project data carries over.
