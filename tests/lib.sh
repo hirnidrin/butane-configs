@@ -14,7 +14,7 @@ build_example() {
 	local server="$1" out
 	out="$(mktemp -d)"
 	ENV_FILE="$REPO_ROOT/servers/$server/.env.example" OUT_DIR="$out" \
-		"$REPO_ROOT/build.sh" "$server" >/dev/null
+		"$REPO_ROOT/build.sh" "$server" >/dev/null || return 1
 	echo "$out/$server.ign"
 }
 
@@ -77,6 +77,9 @@ check() {
 }
 
 contains() { grep -qF -- "$2" <<<"$1"; }
+
+# jqe <filter> <file> - succeed if the filter yields true, print nothing
+jqe() { jq -e "$@" >/dev/null; }
 
 finish() {
 	if [ "$FAILS" -ne 0 ]; then

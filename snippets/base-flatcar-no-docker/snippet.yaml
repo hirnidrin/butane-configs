@@ -1,0 +1,17 @@
+# base-flatcar-no-docker - keep Flatcar's bundled Docker and containerd off
+#
+# No vars.
+#
+# Flatcar ships docker and containerd as sysexts that are merged by default.
+# Masking them with /dev/null links is the documented way to remove them, for
+# hosts that bring their own runtime (e.g. k3s with its embedded containerd).
+storage:
+  links:
+    - path: /etc/extensions/docker-flatcar.raw
+      target: /dev/null
+      hard: false
+      overwrite: true
+    - path: /etc/extensions/containerd-flatcar.raw
+      target: /dev/null
+      hard: false
+      overwrite: true

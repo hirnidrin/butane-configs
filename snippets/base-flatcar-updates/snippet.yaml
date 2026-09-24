@@ -1,0 +1,19 @@
+# base-flatcar-updates - automatic Flatcar updates, reboots only in a weekly window
+#
+# Optional vars: UPDATE_REBOOT_WINDOW_START, UPDATE_REBOOT_WINDOW_LENGTH
+#                (see defaults.env)
+#
+# update-engine downloads updates to the passive partition whenever they
+# appear; locksmithd reboots into them only inside the window. A bad update
+# is rolled back by booting the other partition.
+storage:
+  files:
+    - path: /etc/flatcar/update.conf
+      overwrite: true
+      mode: 0644
+      contents:
+        inline: |
+          GROUP=stable
+          REBOOT_STRATEGY=reboot
+          LOCKSMITHD_REBOOT_WINDOW_START="${UPDATE_REBOOT_WINDOW_START}"
+          LOCKSMITHD_REBOOT_WINDOW_LENGTH=${UPDATE_REBOOT_WINDOW_LENGTH}

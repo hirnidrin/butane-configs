@@ -1,0 +1,24 @@
+# net-static-ip-networkd - static IPv4 on one ethernet interface, IPv6 off,
+# via systemd-networkd
+#
+# Required vars: IPV4_ADDRESS, IPV4_SUBNET_LENGTH, IPV4_GATEWAY, IPV4_DNS
+# Optional vars: NET_IFACE (see defaults.env)
+#
+# Flatcar counterpart of net-static-ip, which writes a NetworkManager keyfile
+# for FCOS. Flatcar ships networkd; its catch-all DHCP config sorts last
+# (zz-default.network), so this 10- file wins for NET_IFACE.
+storage:
+  files:
+    - path: /etc/systemd/network/10-static-${NET_IFACE}.network
+      mode: 0644
+      contents:
+        inline: |
+          [Match]
+          Name=${NET_IFACE}
+
+          [Network]
+          Address=${IPV4_ADDRESS}/${IPV4_SUBNET_LENGTH}
+          Gateway=${IPV4_GATEWAY}
+          DNS=${IPV4_DNS}
+          LinkLocalAddressing=no
+          IPv6AcceptRA=no
