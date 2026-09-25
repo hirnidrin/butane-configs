@@ -5,7 +5,7 @@ ECC, IPMI): a single-node k3s host whose data lives on a ZFS mirror. Built
 with `make quader26` from the repo root.
 
 * OS disk: Crucial M500 240 GB. Disposable: nothing on it is precious.
-* Data: 2× 4 TB as ZFS mirror `tank`. Never touched by Ignition.
+* Data: 2× 4 TB NVMe (Kingston KC3000) as ZFS mirror `tank`. Never touched by Ignition.
 * Fans pinned via IPMI on every boot.
 * Snapshots of `tank/projects`: 24 hourly, 14 daily, 8 weekly.
 * Single-node k3s (pinned); refuses to start without the pool.
