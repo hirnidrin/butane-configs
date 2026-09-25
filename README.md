@@ -74,7 +74,7 @@ Building substitutes the variables, merges the snippets, and transpiles the resu
 make                 # show help and the list of known servers
 make nuc26           # build one server (also: make servers/nuc26/)
 make clean           # remove generated files
-make test            # build every server from .env.example and run the checks
+make test            # build each server that has tests/test-<server>.sh, run the checks
 ```
 
 If a variable is missing from `.env`, the build stops and tells you which one.

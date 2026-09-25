@@ -30,6 +30,10 @@ servers/<name>/.env                real values (gitignored)
 servers/<name>/files/…             optional per-server overrides of snippet payload files
 servers/<name>/<name>.ign          build output (gitignored)
 servers/<name>/.build/             staging: merged.yaml + substituted payloads (gitignored)
+tests/lib.sh                       test helpers: build_example, ign_file, check, …
+tests/test-<server>.sh             checks on a server's generated Ignition JSON
+tests/test-<script>.sh             tests for a payload script with logic
+tests/run.sh                       runs every tests/test-*.sh, then shellcheck
 ```
 
 ## Build commands
@@ -39,8 +43,14 @@ make              # list targets and known servers (default goal)
 make nuc26        # build one server (also: make servers/nuc26, make servers/nuc26/)
 ./build.sh nuc26  # same thing without make
 make clean
-make test         # build every server from .env.example into a temp dir and run tests/
+make test         # run every tests/test-*.sh (each builds its server from .env.example
+                  # into a temp dir), then shellcheck build.sh, tests/ and files/opt/bin/
 ```
+
+`build.sh` takes `BUTANE_ENV_FILE` and `BUTANE_OUT_DIR` to build from another env file into
+another directory; the tests use them so they can never overwrite a real build. They are
+deliberately not named `ENV_FILE` / `OUT_DIR`: a stray variable of that common name in the
+caller's shell must never steer a real build.
 
 Pipeline per server: snippet `defaults.env` + server `.env` → snippet fragments + frame
 → `yq` deep-merge (`*+`: maps merge, arrays append) → `envsubst` → `butane --strict --files-dir`
@@ -56,11 +66,15 @@ build — they are the pre- and post-substitution intermediates.
 3. `.env.example` covering every variable those snippets require but do not default.
 4. `README.md` describing the machine and its post-install steps, linked from the servers
    table in the repo README.
-5. `make <name>` to verify. The Makefile discovers servers by wildcard, so it needs no edit.
+5. `tests/test-<name>.sh` with checks on the generated config. `make test` only builds
+   servers that have one, so a server without it goes untested.
+6. `make <name>` and `make test` to verify. The Makefile discovers servers by wildcard, so it
+   needs no edit.
 
 ## Writing a snippet
 
-1. One concern per snippet. Prefix by kind: `base-`, `net-`, `storage-`, `hw-`, `app-`.
+1. One concern per snippet. Prefix by kind: `base-`, `net-`, `storage-`, `hw-`, `sysext-`,
+   `app-`.
 2. `snippet.yaml` is a **partial** Butane config — no `variant`/`version`, those live in the frame.
 3. Open it with a comment block stating what it does, its required vars, and its optional vars.
 4. Put anything longer than a few lines in `files/` and reference it, instead of inlining it:
@@ -72,8 +86,9 @@ build — they are the pre- and post-substitution intermediates.
    Required variables (secrets, addresses) belong in the server's `.env.example` instead.
 6. Never write a literal `${...}` in a snippet comment or payload unless it is a real variable —
    the build fails on any placeholder left unsubstituted. That check is what catches a variable
-   missing from `.env`, so keep it noise-free.
-
+   missing from `.env`, so keep it noise-free. The same goes for payload scripts, which are
+   staged through `envsubst`: write script-local variables without braces (`$dataset`, not
+   `${dataset}`). `${VAR:-default}` and `${!var}` are safe, the leftover check ignores them.
 7. State the variant in the header comment if the snippet only works on one
    (e.g. networkd vs NetworkManager), and in the README's Variant column.
 8. Flatcar's `/usr` is read-only (sysexts overlay it, `/usr/local` included):
@@ -81,7 +96,8 @@ build — they are the pre- and post-substitution intermediates.
 9. Downloaded artifacts (sysexts, binaries) always carry
    `verification.hash`. Versions and hashes go in `defaults.env`.
 10. Add checks for the snippet to the server's `tests/test-<server>.sh`;
-    scripts with logic get their own `tests/test-<script>.sh`.
+    scripts with logic get their own `tests/test-<script>.sh`. Shell scripts go under
+    `files/opt/bin/`, which is where `tests/run.sh` shellchecks them.
 
 Snippets are merged in the order listed, with the frame merged last, so the frame's scalars win.
 Two snippets writing the same file path is an error — `butane --strict` catches it.
@@ -99,7 +115,25 @@ ordering is expressed by naming the flag it waits on, plus `After=` on the unit.
 
 Services that must run on **every** boot (e.g. `hw-ipmi-fans`) need no flag file at all.
 
+## Public repo: no instance details
+
+This repo is public. It holds reusable config, not a record of real machines:
+
+- No real IPs, hostnames beyond the server name, disk serials or by-id names, MAC
+  addresses, network layout (VLANs, what can reach what), or credentials. Runbooks use
+  placeholders (`<serial>`, `<quader26-ip>`); `.env.example` uses example values.
+- No links or references to private repos that build on a server. References may point
+  *into* this repo, never out of it.
+- Instance records (acceptance logs, inventories, incident notes) live outside this repo.
+- Check commit messages too, and before pushing: `git log -p origin/main..main`.
+
 ## Secrets and generated files
 
-`.env`, `*.butane`, `*.ign` and `.build/` are gitignored — only `*.yaml`, `files/`, and
-`.env.example` are committed. Keep `.env.example` in sync with the variables a server requires.
+`.env`, `*.butane`, `*.ign` and `.build/` are gitignored. Committed: `*.yaml`, `defaults.env`,
+`.env.example`, `files/`, `README.md`s, `tests/`, `build.sh`, `Makefile`. Keep `.env.example` in
+sync with the variables a server requires.
+
+## Commits
+
+Conventional prefixes (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `chore:`), one decision
+per commit.
