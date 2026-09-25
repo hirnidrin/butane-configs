@@ -1,6 +1,8 @@
-# Local environment files with secrets
+# Local environment files with secrets (any variant, but keep the committed example)
 .env
 **/.env
+.env.*
+!.env.example
 
 # Generated files from templates
 *.butane
@@ -13,3 +15,7 @@
 # Backup files
 *.bak
 *~
+
+# Local tool state
+.claude/settings.local.json
+.superpowers/
