@@ -20,26 +20,42 @@ cd ../.. && make quader26                                   # -> servers/quader2
 
 ## Install (first provision and reprovision)
 
-1. On the workstation, serve the config for the installer (LAN only, stop it
-   right after):
+One-time BIOS setup (the Flatcar ISO boots in legacy BIOS mode only):
+Boot → Boot Mode Select `DUAL`; Advanced → PCIe/PCI/PnP → Onboard Video
+Option ROM `Legacy`. The installed system boots either way.
+
+1. Write the current Flatcar Stable ISO to a USB stick. The BMC's virtual
+   media only mounts ISOs from an SMB share.
    ```sh
-   cd servers/quader26 && python3 -m http.server 8000
+   lsblk                               # find the stick; NOT the laptop's disk
+   sudo dd if=flatcar_production_iso_image.iso of=/dev/sdX bs=4M status=progress oflag=sync
    ```
-2. IPMI web UI → virtual media: mount the current Flatcar Stable ISO, boot
-   from it, open the remote console.
-3. **Identify the OS disk by id. Never use `/dev/sdX`.** The two 4 TB disks
-   hold the pool; installing onto one of them destroys it.
+2. Boot quader from the stick: F11, the **non-UEFI** USB entry. Open the
+   iKVM console.
+3. In the console, make the live system reachable:
    ```sh
+   sudo passwd core        # live session only
+   ip -4 addr
+   ```
+4. From the workstation, push the config (nothing on the workstation has to
+   listen, and it works when the host's network can't reach the workstation):
+   ```sh
+   scp servers/quader26/quader26.ign core@<live-ip>:
+   ```
+   In the console, compare `sha256sum ~/quader26.ign` with the workstation's.
+5. **Identify the OS disk by id. Never use `/dev/sdX`.** The two 4 TB NVMe
+   disks hold the pool; installing onto one of them destroys it.
+   ```sh
+   lsblk -o NAME,SIZE,MODEL,SERIAL     # the 240 GB Crucial is the OS disk
    ls -l /dev/disk/by-id/ | grep -v part
-   # pick the ata-Crucial_CT240M500... entry
    ```
-4. Install:
+6. Install:
    ```sh
-   curl -O http://<workstation-ip>:8000/quader26.ign
-   sudo flatcar-install -d /dev/disk/by-id/ata-Crucial_CT240M500SSD1_<serial> -C stable -i quader26.ign
+   sudo flatcar-install -d /dev/disk/by-id/ata-Crucial_CT240M500SSD1_<serial> -C stable -i ~/quader26.ign
    ```
-5. Unmount the ISO, reboot. Stop the workstation's http server.
-6. `ssh core@quader26`
+7. `sudo poweroff`, pull the stick, power on. On a reprovision, clear the
+   old host key on the workstation: `ssh-keygen -R <quader26-ip>`.
+8. `ssh core@quader26`
 
 On first boot Flatcar downloads the zfs sysext, and Ignition downloads the
 ipmitool and k3s sysexts. The box needs internet access.
@@ -51,7 +67,7 @@ Skip this on a reprovision: the pool is found and imported automatically.
 k3s fails to start until this is done. That is intended.
 
 ```sh
-ls -l /dev/disk/by-id/ | grep -v part          # identify the two 4 TB disks
+ls -l /dev/disk/by-id/ | grep -v part          # identify the two 4 TB NVMe disks
 sudo zpool create \
   -o ashift=12 \
   -O compression=zstd -O atime=off -O xattr=sa -O acltype=posixacl \
