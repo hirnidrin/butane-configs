@@ -29,6 +29,8 @@ check "updates: stable channel" contains "$upd" "GROUP=stable"
 check "updates: reboot strategy" contains "$upd" "REBOOT_STRATEGY=reboot"
 check "updates: weekly window start" contains "$upd" 'LOCKSMITHD_REBOOT_WINDOW_START="Sun 04:00"'
 check "updates: window length" contains "$upd" "LOCKSMITHD_REBOOT_WINDOW_LENGTH=1h"
+check "sysupdate reboot timer masked (nothing is sysupdate-managed)" test \
+	"$(ign_link "$ign" /etc/systemd/system/systemd-sysupdate-reboot.timer)" = /dev/null
 
 check "docker-flatcar sysext disabled" test "$(ign_link "$ign" /etc/extensions/docker-flatcar.raw)" = /dev/null
 check "containerd-flatcar sysext disabled" test "$(ign_link "$ign" /etc/extensions/containerd-flatcar.raw)" = /dev/null

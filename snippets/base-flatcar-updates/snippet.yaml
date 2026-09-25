@@ -17,3 +17,12 @@ storage:
           REBOOT_STRATEGY=reboot
           LOCKSMITHD_REBOOT_WINDOW_START="${UPDATE_REBOOT_WINDOW_START}"
           LOCKSMITHD_REBOOT_WINDOW_LENGTH=${UPDATE_REBOOT_WINDOW_LENGTH}
+  links:
+    # Flatcar enables systemd-sysupdate-reboot.timer in the image. With no
+    # sysupdate-managed components it fails every night ("Couldn't find any
+    # suitable installed versions") and can never reboot anything; reboots
+    # are locksmithd's job, in the window above.
+    - path: /etc/systemd/system/systemd-sysupdate-reboot.timer
+      target: /dev/null
+      hard: false
+      overwrite: true
