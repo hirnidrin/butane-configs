@@ -10,6 +10,12 @@ check "Ignition 3.4.0 (butane flatcar 1.1.0)" test "$(jq -r .ignition.version "$
 check "hostname" test "$(ign_file "$ign" /etc/hostname)" = quader26
 check "core user has an ssh key" jqe '.passwd.users[] | select(.name == "core") | .sshAuthorizedKeys | length == 1' "$ign"
 
+check "ssh: key-only drop-in sorts before Flatcar's 50-" jqe '.storage.files[] | select(.path == "/etc/ssh/sshd_config.d/10-key-only.conf") | .mode == 384' "$ign"
+sshd="$(ign_file "$ign" /etc/ssh/sshd_config.d/10-key-only.conf)"
+check "ssh: no password auth" contains "$sshd" "PasswordAuthentication no"
+check "ssh: no keyboard-interactive" contains "$sshd" "KbdInteractiveAuthentication no"
+check "ssh: no root login" contains "$sshd" "PermitRootLogin no"
+
 net="$(ign_file "$ign" /etc/systemd/network/10-static-eno1.network)"
 check "networkd: matches eno1" contains "$net" "Name=eno1"
 check "networkd: static address" contains "$net" "Address=192.168.123.123/24"

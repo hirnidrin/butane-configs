@@ -1,0 +1,18 @@
+# base-ssh-key-only - SSH login with keys only: no passwords, no
+# keyboard-interactive, no root
+#
+# No vars.
+#
+# sshd uses the first value it reads for each option, and drop-ins are read
+# in lexical order, so this 10- file wins over the distribution's own (e.g.
+# Flatcar's 50-flatcar-sshd.conf, which leaves keyboard-interactive on via
+# PAM). The user's password keeps working on the local/IPMI console.
+storage:
+  files:
+    - path: /etc/ssh/sshd_config.d/10-key-only.conf
+      mode: 0600
+      contents:
+        inline: |
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PermitRootLogin no

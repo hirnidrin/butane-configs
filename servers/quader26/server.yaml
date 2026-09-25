@@ -6,6 +6,7 @@
 # reprovisioning.
 snippets:
   - base-core-user
+  - base-ssh-key-only
   - base-hostname
   - net-static-ip-networkd
   - base-flatcar-updates

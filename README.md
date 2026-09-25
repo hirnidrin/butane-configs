@@ -19,6 +19,7 @@ addresses, and `make <name>` produces the Ignition config.
 |---------|---------|---------|
 | `base-core-user` | any | `core` user with SSH key and password hash |
 | `base-hostname` | any | static hostname |
+| `base-ssh-key-only` | any | SSH with keys only: no passwords, no keyboard-interactive, no root |
 | `base-flatcar-updates` | Flatcar | automatic updates, reboots in a weekly window |
 | `base-flatcar-no-docker` | Flatcar | disable the bundled docker and containerd sysexts |
 | `net-static-ip` | FCOS | static IPv4 on one ethernet interface, IPv6 disabled (NetworkManager) |
