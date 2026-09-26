@@ -8,3 +8,4 @@ write-kubeconfig-mode: "0600"
 secrets-encryption: true
 disable:
   - traefik
+  - local-storage

@@ -83,6 +83,7 @@ k3sconf="$(ign_file "$ign" /etc/rancher/k3s/config.yaml)"
 check "k3s: node ip" contains "$k3sconf" "node-ip: 192.168.123.123"
 check "k3s: tls san hostname" contains "$k3sconf" "- quader26"
 check "k3s: bundled traefik disabled" contains "$k3sconf" "- traefik"
+check "k3s: local-path storage disabled (no default class on the OS disk)" contains "$k3sconf" "- local-storage"
 check "k3s: secrets encrypted at rest" contains "$k3sconf" "secrets-encryption: true"
 check "k3s: kubeconfig root-only" contains "$k3sconf" 'write-kubeconfig-mode: "0600"'
 check "k3s: config not world-readable" jqe '.storage.files[] | select(.path == "/etc/rancher/k3s/config.yaml") | .mode == 384' "$ign"

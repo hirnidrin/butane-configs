@@ -14,7 +14,10 @@
 # no k3s. Needs storage-zfs-import.
 #
 # Bundled Traefik is disabled (the ingress is installed and pinned from git);
-# the built-in service load balancer is kept.
+# the built-in service load balancer is kept. The bundled local-path
+# provisioner is disabled too: it would make a default StorageClass that
+# puts volumes on the OS disk. With it off, a claim without an explicit
+# storage class stays Pending instead.
 storage:
   files:
     - path: /opt/extensions/k3s/k3s-${K3S_VERSION}-x86-64.raw
