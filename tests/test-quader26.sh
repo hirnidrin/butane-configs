@@ -79,6 +79,9 @@ check "k3s sysext merged" test "$(ign_link "$ign" /etc/extensions/k3s.raw)" = /o
 check "k3s server enabled" test \
 	"$(ign_link "$ign" /etc/systemd/system/multi-user.target.wants/k3s.service)" = /usr/local/lib/systemd/system/k3s.service
 check "no sysupdate for k3s" test -z "$(jq -r '.storage.files[].path | select(contains("sysupdate"))' "$ign")"
+check "k3s-swap installed, executable" jqe '.storage.files[] | select(.path == "/opt/bin/k3s-swap") | .mode == 493' "$ign"
+check "k3s-swap is the snippet's script, unmangled by the build" test \
+	"$(ign_file "$ign" /opt/bin/k3s-swap)" = "$(cat "$REPO_ROOT/snippets/app-k3s-server/files/opt/bin/k3s-swap")"
 k3sconf="$(ign_file "$ign" /etc/rancher/k3s/config.yaml)"
 check "k3s: node ip" contains "$k3sconf" "node-ip: 192.168.123.123"
 check "k3s: tls san hostname" contains "$k3sconf" "- quader26"

@@ -5,8 +5,11 @@
 #                net-static-ip-networkd)
 # Optional vars: K3S_VERSION, K3S_SHA256 (see defaults.env)
 #
-# Deliberately no systemd-sysupdate, unlike the bakery's example: a k3s
-# upgrade is a change to K3S_VERSION/K3S_SHA256 and a reprovision.
+# Deliberately no systemd-sysupdate, unlike the bakery's example: an update
+# starts from a commit, never on its own. It is a committed change to
+# K3S_VERSION/K3S_SHA256, applied in place with
+# `/opt/bin/k3s-swap to <version> <sha256>` (same or next minor; `rollback`
+# undoes it through one reboot) or by a reprovision.
 #
 # containerd's store lives on the ZFS dataset tank/system/containerd,
 # mounted at /var/lib/rancher/k3s/agent/containerd, to spare the OS disk.
@@ -26,6 +29,10 @@ storage:
         source: https://extensions.flatcar.org/extensions/k3s-${K3S_VERSION}-x86-64.raw
         verification:
           hash: sha256-${K3S_SHA256}
+    - path: /opt/bin/k3s-swap
+      mode: 0755
+      contents:
+        local: opt/bin/k3s-swap
     - path: /etc/rancher/k3s/config.yaml
       mode: 0600
       contents:

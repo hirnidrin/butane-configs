@@ -31,7 +31,7 @@ addresses, and `make <name>` produces the Ignition config.
 | `hw-ipmi-fans` | any | pin IPMI fan duty cycles on every boot (needs `ipmitool`: `sysext-ipmitool` on Flatcar) |
 | `app-wg-easy` | FCOS | wg-easy WireGuard engine + webadmin, as a system quadlet (Podman) |
 | `app-caddy-tls-proxy` | FCOS | caddy on the host network, TLS for a localhost-only upstream (Podman) |
-| `app-k3s-server` | Flatcar | pinned single-node k3s that refuses to start without its ZFS dataset |
+| `app-k3s-server` | Flatcar | pinned single-node k3s that refuses to start without its ZFS dataset; `k3s-swap` updates it in place |
 
 Each snippet documents its variables in the comment block at the top of its `snippet.yaml`, and
 ships defaults for the optional ones in `defaults.env`.

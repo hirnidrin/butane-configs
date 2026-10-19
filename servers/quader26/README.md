@@ -143,10 +143,43 @@ systemctl list-timers 'zfs-autosnap@*'
 zfs list -t snapshot -r tank/projects
 ```
 
-## Upgrading k3s
+## Updating k3s in place
 
 Pick a version and hash from
-`https://extensions.flatcar.org/extensions/k3s/SHA256SUMS`, set `K3S_VERSION`
-and `K3S_SHA256` in `.env` (or bump `snippets/app-k3s-server/defaults.env`),
-rebuild and reprovision. Stay within a minor release unless you mean to
-upgrade Kubernetes.
+`https://extensions.flatcar.org/extensions/k3s/SHA256SUMS`: the same minor
+with a newer patch, or the next minor (Kubernetes can't skip one). Bump
+`K3S_VERSION` and `K3S_SHA256` in `snippets/app-k3s-server/defaults.env` and
+commit it **first**, so a reprovision lands on the same version. Then:
+
+```sh
+sudo k3s-swap status                  # current: v1.36.4+k3s1 / swap: none
+sudo k3s-swap to <version> <sha256>   # ends with: k3s: <old> -> <new>
+```
+
+`to` stops k3s for a minute or two; running pods keep running. It keeps the
+old sysext, a copy of `/var/lib/rancher/k3s/server/` and a snapshot of the
+containerd dataset. When the new version is good:
+
+```sh
+sudo k3s-swap clean                   # k3s: <new>, nothing else kept
+```
+
+To undo instead (needs a reboot, no network):
+
+```sh
+sudo k3s-swap rollback                # k3s masked. Reboot now …
+sudo systemctl reboot
+sudo k3s-swap rollback-finish         # k3s: back on <old>
+```
+
+Then revert the pin commit. If `to` fails partway, it says so and names
+`k3s-swap rollback`.
+
+A box provisioned before `k3s-swap` was part of the snippet doesn't have it.
+Copy it once from a build (`make quader26`):
+
+```sh
+scp servers/quader26/.build/files/opt/bin/k3s-swap core@<host>:
+ssh core@<host> 'sudo install -m 0755 k3s-swap /opt/bin/ && sha256sum /opt/bin/k3s-swap'
+sha256sum servers/quader26/.build/files/opt/bin/k3s-swap   # same hash
+```
