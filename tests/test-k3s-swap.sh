@@ -143,4 +143,81 @@ check "node keeps old version: exit 1" test "$rc" = 1
 check "node keeps old version: names rollback" contains "$out" "k3s-swap rollback"
 check "node keeps old version: no to" test ! -e "$STATE/to"
 
+# --- rollback ---------------------------------------------------------------------
+swapped() { # a completed swap v1.36.4 -> v1.37.1, call log cleared
+	seed
+	FAKE_KUBELET=v1.37.1+k3s1 run to v1.37.1+k3s1 "$SHA"
+	echo "datastore after" >"$DB"
+	: >"$calls"
+}
+
+seed; run rollback
+check "rollback without a swap: exit 2" test "$rc" = 2
+check "rollback without a swap: no action" no_action
+
+swapped; run rollback
+check "rollback succeeds" test "$rc" = 0
+check "rollback masks k3s" grep -qx 'systemctl mask k3s' "$calls"
+check "rollback marks pending" test -e "$STATE/rollback-pending"
+check "rollback touches no dataset before the reboot" test -z "$(grep '^zfs' "$calls" || true)"
+check "rollback says to reboot" contains "$out" "k3s-swap rollback-finish"
+run status
+check "status: rollback pending" contains "$out" "rollback pending"
+run rollback
+check "rollback twice: exit 2" test "$rc" = 2
+FAKE_KUBELET=v1.37.1+k3s1 run to v1.37.1+k3s1 "$SHA"
+check "to while rollback pending: exit 2" test "$rc" = 2
+
+swapped; run rollback-finish
+check "finish without rollback: exit 2" test "$rc" = 2
+check "finish without rollback: no action" no_action
+
+swapped; run rollback; : >"$calls"
+FAKE_ACTIVE=0 run rollback-finish
+check "finish while k3s runs: exit 2" test "$rc" = 2
+check "finish while k3s runs: no zfs call" test -z "$(grep '^zfs' "$calls" || true)"
+FAKE_SHIMS=0 run rollback-finish
+check "finish while a shim runs: exit 2" test "$rc" = 2
+check "finish while a shim runs: no zfs call" test -z "$(grep '^zfs' "$calls" || true)"
+
+FAKE_KUBELET=v1.36.4+k3s1 run rollback-finish
+check "finish succeeds" test "$rc" = 0
+check "finish: datastore restored" test "$(cat "$DB" 2>/dev/null)" = "datastore before"
+check "finish: containerd rolled back, then the snapshot dropped" in_order \
+	"zfs rollback -r tank/system/containerd@k3s-swap-pre" \
+	"zfs destroy tank/system/containerd@k3s-swap-pre"
+check "finish: symlink back to the old sysext" test "$(readlink "$LINK")" = /opt/extensions/k3s/k3s-v1.36.4+k3s1-x86-64.raw
+check "finish: new sysext removed" test ! -e "$EXT/k3s-v1.37.1+k3s1-x86-64.raw"
+check "finish: refresh, unmask, start, in order" in_order \
+	"systemd-sysext refresh" "systemctl unmask k3s" "systemctl start k3s"
+check "finish: swap state gone" test ! -e "$STATE"
+run status
+check "status after rollback: none" contains "$out" "swap: none"
+check "status after rollback: old version" contains "$out" "current: v1.36.4+k3s1"
+
+seed; FAKE_REFRESH_RC=1 run to v1.37.1+k3s1 "$SHA"
+run rollback
+FAKE_KUBELET=v1.36.4+k3s1 run rollback-finish
+check "rollback after a failed swap succeeds" test "$rc" = 0
+check "rollback after a failed swap: back on the old sysext" test "$(readlink "$LINK")" = /opt/extensions/k3s/k3s-v1.36.4+k3s1-x86-64.raw
+
+# --- clean ------------------------------------------------------------------------
+swapped; run clean
+check "clean succeeds" test "$rc" = 0
+check "clean: swap state gone" test ! -e "$STATE"
+check "clean: snapshot dropped" grep -qx 'zfs destroy tank/system/containerd@k3s-swap-pre' "$calls"
+check "clean: only the current sysext left" test "$(ls "$EXT")" = k3s-v1.37.1+k3s1-x86-64.raw
+check "clean: symlink unchanged" test "$(readlink "$LINK")" = /opt/extensions/k3s/k3s-v1.37.1+k3s1-x86-64.raw
+check "clean: k3s untouched" test -z "$(grep '^systemctl' "$calls" || true)"
+
+seed; echo stray >"$EXT/k3s-v1.35.0+k3s1-x86-64.raw"
+FAKE_SNAP_RC=1 run clean
+check "clean without a swap succeeds" test "$rc" = 0
+check "clean without a swap: stray sysext removed" test "$(ls "$EXT")" = k3s-v1.36.4+k3s1-x86-64.raw
+check "clean without a swap: no destroy" test -z "$(grep '^zfs destroy' "$calls" || true)"
+
+swapped; run rollback; run clean
+check "clean while rollback pending: exit 2" test "$rc" = 2
+check "clean while rollback pending: state kept" test -e "$STATE/server"
+
 finish
