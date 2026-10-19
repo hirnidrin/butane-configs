@@ -6,7 +6,7 @@
 #   k3s-swap to <version> <sha256>    e.g. to v1.37.1+k3s1 <64 hex>
 #   k3s-swap rollback                 then reboot, then:
 #   k3s-swap rollback-finish
-#   k3s-swap clean                    keep the new version, drop the old
+#   k3s-swap clean [--incomplete]     keep the new version, drop the old
 #
 # The k3s sysext is /opt/extensions/k3s/k3s-<version>-x86-64.raw, merged
 # through the symlink /etc/extensions/k3s.raw. `to` downloads the new file
@@ -22,7 +22,11 @@
 # running. `rollback` masks k3s; after the reboot, `rollback-finish` restores
 # server/, rolls the dataset back, repoints the symlink and starts k3s.
 #
-# Swap state: /var/lib/rancher/k3s-swap/ (from, to, server/, rollback-pending).
+# Swap state: /var/lib/rancher/k3s-swap/: from, server/ + backed-up (the
+# copy and snapshot are complete), to (the swap finished), rollback-pending,
+# restored (rollback-finish got past the restore; rerunning it is safe).
+# `rollback` before backed-up exists only starts k3s again: nothing changed.
+# `clean` refuses an unfinished swap unless given --incomplete.
 # Change the k3s pin in the Butane config first, so a reprovision lands on
 # the same version. This script never touches the config.
 #
@@ -99,6 +103,8 @@ cmd_status() {
 	echo "current: $(current_version)"
 	if [ ! -e "$STATE" ]; then
 		echo "swap: none"
+	elif [ -e "$STATE/restored" ]; then
+		echo "swap: rolled back to $(cat "$STATE/from"), not finished (k3s-swap rollback-finish)"
 	elif [ -e "$STATE/rollback-pending" ]; then
 		echo "swap: rollback pending (reboot, then k3s-swap rollback-finish)"
 	elif [ -e "$STATE/to" ]; then
@@ -129,12 +135,17 @@ cmd_to() {
 	fi
 	mv "$file.partial" "$file"
 
-	trap 'echo "k3s-swap: failed after stopping k3s; undo with: k3s-swap rollback" >&2' ERR
 	systemctl stop k3s
 	mkdir -p "$STATE"
 	echo "$current" >"$STATE/from"
-	cp -a "$SERVER" "$STATE/server"
+	trap 'echo "k3s-swap: failed after stopping k3s; undo with: k3s-swap rollback" >&2' ERR
+	# The copy is complete only once backed-up exists: rollback never puts a
+	# half-written copy over the real datastore.
+	cp -a "$SERVER" "$STATE/server.partial"
+	sync
+	mv "$STATE/server.partial" "$STATE/server"
 	zfs snapshot "$dataset@$SNAP_NAME"
+	touch "$STATE/backed-up"
 	ln -sfn "$(raw_path "$version")" "$LINK"
 	systemd-sysext refresh
 	systemctl start k3s
@@ -146,10 +157,25 @@ cmd_to() {
 
 snapshot_exists() { zfs list -H -t snapshot "$1@$SNAP_NAME" >/dev/null 2>&1; }
 
+flatcar_update_staged() {
+	command -v update_engine_client >/dev/null &&
+		update_engine_client -status 2>/dev/null | grep -q NEED_REBOOT
+}
+
 cmd_rollback() {
 	[ $# -eq 0 ] || die "usage: k3s-swap rollback"
-	[ -e "$STATE/from" ] && [ -d "$STATE/server" ] || die "no swap to roll back"
+	[ -e "$STATE/from" ] || die "no swap to roll back"
 	[ ! -e "$STATE/rollback-pending" ] || die "rollback already pending: reboot, then k3s-swap rollback-finish"
+	if [ ! -e "$STATE/backed-up" ]; then
+		# `to` stopped k3s but failed before the symlink moved.
+		drop_old "$(containerd_dataset)"
+		systemctl start k3s
+		echo "k3s-swap: nothing had changed; k3s started again on $(current_version)"
+		return 0
+	fi
+	if flatcar_update_staged; then
+		echo "k3s-swap: warning: a Flatcar update is staged, and the reboot will boot it too." >&2
+	fi
 	systemctl mask k3s
 	touch "$STATE/rollback-pending"
 	echo "k3s masked. Reboot now (sudo systemctl reboot), then run: sudo k3s-swap rollback-finish"
@@ -158,22 +184,30 @@ cmd_rollback() {
 cmd_rollback_finish() {
 	[ $# -eq 0 ] || die "usage: k3s-swap rollback-finish"
 	[ -e "$STATE/rollback-pending" ] || die "no rollback pending: k3s-swap rollback first"
-	! systemctl is-active --quiet k3s || die "k3s is running: reboot first"
-	! pgrep -f containerd-shim >/dev/null || die "container shims are running: reboot first"
+	[ -e "$STATE/backed-up" ] || die "no complete backup in $STATE"
 	local from dataset
 	from="$(cat "$STATE/from")"
-	[ -e "$R$(raw_path "$from")" ] || fail "the old sysext $(raw_path "$from") is gone"
 	dataset="$(containerd_dataset)"
-	rm -rf "$SERVER"
-	cp -a "$STATE/server" "$SERVER"
-	if snapshot_exists "$dataset"; then
-		zfs rollback -r "$dataset@$SNAP_NAME"
+	# Once restored, a rerun (say after a timeout) only starts and waits.
+	if [ ! -e "$STATE/restored" ]; then
+		! systemctl is-active --quiet k3s || die "k3s is running: reboot first"
+		! pgrep -f containerd-shim >/dev/null || die "container shims are running: reboot first"
+		[ -e "$R$(raw_path "$from")" ] || fail "the old sysext $(raw_path "$from") is gone"
+		rm -rf "$SERVER.new" "$SERVER.old"
+		cp -a "$STATE/server" "$SERVER.new"
+		mv "$SERVER" "$SERVER.old"
+		mv "$SERVER.new" "$SERVER"
+		rm -rf "$SERVER.old"
+		if snapshot_exists "$dataset"; then
+			zfs rollback -r "$dataset@$SNAP_NAME"
+		fi
+		ln -sfn "$(raw_path "$from")" "$LINK"
+		systemd-sysext refresh
+		touch "$STATE/restored"
 	fi
-	ln -sfn "$(raw_path "$from")" "$LINK"
-	systemd-sysext refresh
 	systemctl unmask k3s
 	systemctl start k3s
-	wait_for "$from" || fail "node not Ready on $from after $TIMEOUT seconds"
+	wait_for "$from" || fail "node not Ready on $from after $TIMEOUT seconds; run k3s-swap rollback-finish again"
 	drop_old "$dataset"
 	echo "k3s: back on $from"
 }
@@ -194,13 +228,29 @@ drop_old() {
 }
 
 cmd_clean() {
-	[ $# -eq 0 ] || die "usage: k3s-swap clean"
-	[ ! -e "$STATE/rollback-pending" ] || die "rollback pending: reboot, then k3s-swap rollback-finish"
+	local incomplete=0
+	case "$*" in
+	"") ;;
+	--incomplete) incomplete=1 ;;
+	*) die "usage: k3s-swap clean [--incomplete]" ;;
+	esac
+	if [ -e "$STATE/rollback-pending" ] && [ ! -e "$STATE/restored" ]; then
+		die "rollback pending: reboot, then k3s-swap rollback-finish"
+	fi
+	if [ -e "$STATE" ] && [ ! -e "$STATE/to" ] && [ ! -e "$STATE/restored" ] && [ "$incomplete" = 0 ]; then
+		die "the swap from $(cat "$STATE/from" 2>/dev/null || echo unknown) didn't finish: k3s-swap rollback to undo it, or k3s-swap clean --incomplete to keep what runs now and drop the backup"
+	fi
+	if [ -e "$STATE/restored" ]; then
+		systemctl unmask k3s
+	fi
 	drop_old "$(containerd_dataset)"
+	if ! systemctl is-active --quiet k3s; then
+		echo "k3s-swap: warning: k3s is not running (sudo systemctl start k3s)" >&2
+	fi
 	echo "k3s: $(current_version), nothing else kept"
 }
 
-[ $# -ge 1 ] || die "usage: k3s-swap status | to <version> <sha256> | rollback | rollback-finish | clean"
+[ $# -ge 1 ] || die "usage: k3s-swap status | to <version> <sha256> | rollback | rollback-finish | clean [--incomplete]"
 sub="$1"
 shift
 case "$sub" in

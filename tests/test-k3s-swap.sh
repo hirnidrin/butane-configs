@@ -26,6 +26,9 @@ stub findmnt 'echo tank/system/containerd'
 stub mountpoint 'exit "${FAKE_MOUNTED:-0}"'
 stub pgrep 'exit "${FAKE_SHIMS:-1}"'
 stub k3s 'case "$*" in *kubeletVersion*) echo "$FAKE_KUBELET" ;; esac; exit 0'
+stub update_engine_client 'echo "${FAKE_UE_STATUS:-CURRENT_OP=UPDATE_STATUS_IDLE}"'
+# cp works for real unless FAKE_CP_FAIL is set (a full disk mid-copy).
+stub cp "[ -z \"\${FAKE_CP_FAIL:-}\" ] || exit 1; exec $(command -v cp) \"\$@\""
 
 FAKE_RAW="new k3s sysext"
 SHA="$(printf %s "$FAKE_RAW" | sha256sum | cut -d' ' -f1)"
@@ -208,7 +211,8 @@ check "clean: swap state gone" test ! -e "$STATE"
 check "clean: snapshot dropped" grep -qx 'zfs destroy tank/system/containerd@k3s-swap-pre' "$calls"
 check "clean: only the current sysext left" test "$(ls "$EXT")" = k3s-v1.37.1+k3s1-x86-64.raw
 check "clean: symlink unchanged" test "$(readlink "$LINK")" = /opt/extensions/k3s/k3s-v1.37.1+k3s1-x86-64.raw
-check "clean: k3s untouched" test -z "$(grep '^systemctl' "$calls" || true)"
+check "clean: k3s untouched" test -z "$(grep '^systemctl' "$calls" | grep -v '^systemctl is-active' || true)"
+check "clean: warns when k3s isn't running" contains "$out" "k3s is not running"
 
 seed; echo stray >"$EXT/k3s-v1.35.0+k3s1-x86-64.raw"
 FAKE_SNAP_RC=1 run clean
@@ -219,5 +223,45 @@ check "clean without a swap: no destroy" test -z "$(grep '^zfs destroy' "$calls"
 swapped; run rollback; run clean
 check "clean while rollback pending: exit 2" test "$rc" = 2
 check "clean while rollback pending: state kept" test -e "$STATE/server"
+
+# --- review fixes ------------------------------------------------------------------
+# A copy that dies halfway must never replace the real datastore.
+seed; FAKE_CP_FAIL=1 run to v1.37.1+k3s1 "$SHA"
+check "copy fails: exit 1" test "$rc" = 1
+check "copy fails: no complete backup" test ! -e "$STATE/backed-up"
+check "copy fails: names rollback" contains "$out" "k3s-swap rollback"
+: >"$calls"; run rollback
+check "rollback after a failed copy succeeds" test "$rc" = 0
+check "rollback after a failed copy: nothing to undo, no reboot" contains "$out" "nothing had changed"
+check "rollback after a failed copy: k3s started, not masked" in_order "systemctl start k3s"
+check "rollback after a failed copy: no mask" test -z "$(grep -x 'systemctl mask k3s' "$calls" || true)"
+check "rollback after a failed copy: datastore untouched" test "$(cat "$DB")" = "datastore before"
+check "rollback after a failed copy: symlink unchanged" test "$(readlink "$LINK")" = /opt/extensions/k3s/k3s-v1.36.4+k3s1-x86-64.raw
+check "rollback after a failed copy: state gone" test ! -e "$STATE"
+
+# A rollback-finish that times out can be run again, even with k3s running.
+swapped; run rollback
+FAKE_KUBELET=v1.37.1+k3s1 K3S_SWAP_TIMEOUT=0 run rollback-finish
+check "finish times out: exit 1" test "$rc" = 1
+check "finish times out: datastore already restored" test "$(cat "$DB")" = "datastore before"
+FAKE_ACTIVE=0 FAKE_KUBELET=v1.36.4+k3s1 run rollback-finish
+check "finish again after a timeout succeeds" test "$rc" = 0
+check "finish again: state gone" test ! -e "$STATE"
+
+# clean keeps an unfinished swap unless told otherwise.
+seed; FAKE_KUBELET=v1.36.4+k3s1 K3S_SWAP_TIMEOUT=0 run to v1.37.1+k3s1 "$SHA"
+run clean
+check "clean after an unfinished swap: exit 2" test "$rc" = 2
+check "clean after an unfinished swap: backup kept" test -e "$STATE/server"
+check "clean after an unfinished swap: says how" contains "$out" "clean --incomplete"
+FAKE_ACTIVE=0 run clean --incomplete
+check "clean --incomplete succeeds" test "$rc" = 0
+check "clean --incomplete: state gone" test ! -e "$STATE"
+
+# The rollback reboot would also boot a staged Flatcar update.
+swapped; FAKE_UE_STATUS=CURRENT_OP=UPDATE_STATUS_UPDATED_NEED_REBOOT run rollback
+check "rollback warns about a staged Flatcar update" contains "$out" "Flatcar update is staged"
+swapped; run rollback
+check "rollback quiet without a staged update" test -z "$(grep 'Flatcar update' <<<"$out" || true)"
 
 finish

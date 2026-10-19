@@ -153,8 +153,12 @@ commit it **first**, so a reprovision lands on the same version. Then:
 
 ```sh
 sudo k3s-swap status                  # current: v1.36.4+k3s1 / swap: none
-sudo k3s-swap to <version> <sha256>   # ends with: k3s: <old> -> <new>
+sudo systemd-run --unit=k3s-swap --collect --wait /opt/bin/k3s-swap to <version> <sha256>
+sudo journalctl -u k3s-swap -o cat --no-pager -n 20   # ends with: k3s: <old> -> <new>
 ```
+
+`systemd-run` keeps the swap going if the SSH session drops halfway; then
+log in again and follow it with `sudo journalctl -u k3s-swap -f`.
 
 `to` stops k3s for a minute or two; running pods keep running. It keeps the
 old sysext, a copy of `/var/lib/rancher/k3s/server/` and a snapshot of the
@@ -173,7 +177,10 @@ sudo k3s-swap rollback-finish         # k3s: back on <old>
 ```
 
 Then revert the pin commit. If `to` fails partway, it says so and names
-`k3s-swap rollback`.
+`k3s-swap rollback`; if it failed before anything changed, `rollback` just
+starts k3s again, without a reboot. If `rollback-finish` times out, run it
+again. `clean` refuses a swap that didn't finish; `clean --incomplete` keeps
+what runs now and drops the backup.
 
 A box provisioned before `k3s-swap` was part of the snippet doesn't have it.
 Copy it once from a build (`make quader26`):
