@@ -60,7 +60,7 @@ check "Ignition never touches disks" jqe '(.storage.disks // []) == [] and (.sto
 
 # --- snapshots ----------------------------------------------------------------
 snapconf="$(ign_file "$ign" /etc/zfs-autosnap.conf)"
-check "snapshots: dataset" contains "$snapconf" "AUTOSNAP_DATASET=tank/projects"
+check "snapshots: projects and quaipa" contains "$snapconf" 'AUTOSNAP_DATASETS="tank/projects tank/quaipa"'
 check "snapshots: keep 24 hourly" contains "$snapconf" "AUTOSNAP_KEEP_HOURLY=24"
 check "snapshots: keep 14 daily" contains "$snapconf" "AUTOSNAP_KEEP_DAILY=14"
 check "snapshots: keep 8 weekly" contains "$snapconf" "AUTOSNAP_KEEP_WEEKLY=8"

@@ -7,7 +7,8 @@ with `make quader26` from the repo root.
 * OS disk: Crucial M500 240 GB. Disposable: nothing on it is precious.
 * Data: 2× 4 TB NVMe (Kingston KC3000) as ZFS mirror `tank`. Never touched by Ignition.
 * Fans pinned via IPMI on every boot.
-* Snapshots of `tank/projects`: 24 hourly, 14 daily, 8 weekly.
+* Snapshots of `tank/projects` and `tank/quaipa`, each tree recursive: 24
+  hourly, 14 daily, 8 weekly.
 * Single-node k3s (pinned); refuses to start without the pool.
 * Flatcar Stable, automatic updates, reboots Sundays 04:00–05:00.
 
@@ -78,6 +79,11 @@ sudo zfs create tank/projects
 sudo systemctl restart k3s
 ```
 
+The datasets below these (`tank/projects/<name>`, `tank/quaipa/home`) are
+made by whatever runs on top, with the owner and quota it needs. Until
+`tank/quaipa` exists, each snapshot run reports it failed; `tank/projects`
+is still snapshotted.
+
 **Never add `-f` to `zpool create`.** Without it, ZFS refuses disks that
 already carry a pool, which is the only thing standing between a mistyped
 command and an empty pool.
@@ -141,6 +147,7 @@ sudo ipmitool sensor | grep -i fan
 zpool status tank                         # mirror, ONLINE
 systemctl list-timers 'zfs-autosnap@*'
 zfs list -t snapshot -r tank/projects
+zfs list -t snapshot -r tank/quaipa
 ```
 
 ## Updating k3s in place
