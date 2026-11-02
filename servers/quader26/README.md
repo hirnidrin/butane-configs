@@ -42,8 +42,12 @@ Option ROM `Legacy`. The installed system boots either way.
    listen, and it works when the host's network can't reach the workstation):
    ```sh
    scp servers/quader26/quader26.ign core@<live-ip>:
+   sha256sum servers/quader26/quader26.ign      # on the workstation
    ```
-   In the console, compare `sha256sum ~/quader26.ign` with the workstation's.
+   Then in the console, the same hash, or don't install:
+   ```sh
+   sha256sum ~/quader26.ign
+   ```
 5. **Identify the OS disk by id. Never use `/dev/sdX`.** The two 4 TB NVMe
    disks hold the pool; installing onto one of them destroys it.
    ```sh
