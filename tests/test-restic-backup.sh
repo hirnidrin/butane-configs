@@ -177,6 +177,19 @@ check "root missing: exit 1" test "$rc" = 1
 check "root missing: no restic call" not_called "restic"
 check "root missing: no ping" not_pinged
 
+# --- the reason comes last, where the log's tail shows it ------------------------
+last_line() { tail -n 1 "$work/out"; }
+reset; good_conf; project hello 49; project moser 3; run
+check "failures named last: stale" test "$(last_line)" = "restic-backup: failed: hello"
+reset; good_conf; project hello 3; project moser 3; FAKE_RESTIC_FAIL='^restic (backup.*--tag (hello|moser)|forget|check|unlock)' run
+check "failures named last: all of them" test "$(last_line)" = "restic-backup: failed: unlock hello moser prune check"
+
+# --- all skipped: nothing was backed up, so that can't look like success --------
+reset; good_conf; project moser 3; hours_ago 2 >"$work/z/moser/created"; : >"$work/z/moser/snaps"; run
+check "all skipped: exit 1" test "$rc" = 1
+check "all skipped: no ping" not_pinged
+check "all skipped: says so" test "$(last_line)" = "restic-backup: failed: nothing backed up"
+
 # --- a failed ping doesn't fail the backup --------------------------------------
 reset; good_conf; project hello 3; FAKE_CURL_RC=7 run
 check "ping fails: exit 0" test "$rc" = 0
