@@ -32,7 +32,8 @@ ign_file() {
 		fi
 		;;
 	"data:,"*)
-		python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote(sys.argv[1]))' "${src#data:,}"
+		src="${src#data:,}"
+		printf '%b' "${src//%/\\x}"
 		;;
 	*)
 		echo "no inline file at $2" >&2
