@@ -92,7 +92,7 @@ check "backup: wants the network" contains "$backupsvc" "Wants=network-online.ta
 check "backup: cache on the OS disk" contains "$backupsvc" "Environment=RESTIC_CACHE_DIR=/var/cache/restic"
 check "backup: cache directory made by systemd" contains "$backupsvc" "CacheDirectory=restic"
 backuptimer="$(ign_unit "$ign" restic-backup.timer)"
-check "backup: runs at 03:30, off the hour's snapshots" contains "$backuptimer" "OnCalendar=*-*-* 03:30:00"
+check "backup: runs at 01:30, off the hour's snapshots and before the update window" contains "$backuptimer" "OnCalendar=*-*-* 01:30:00"
 check "backup: catches up after downtime" contains "$backuptimer" "Persistent=true"
 check "backup: timer enabled" ign_unit_enabled "$ign" restic-backup.timer
 for secret in RESTIC_PASSWORD= OS_PASSWORD= HEALTHCHECK_URL= RESTIC_REPOSITORY=; do
