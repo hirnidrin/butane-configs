@@ -15,7 +15,7 @@ Server directories are named after the **real server** (`nuc26`), never after th
 
 **Tools required:** `butane` (transpiler), `yq` (mikefarah/yq v4, YAML merge), `envsubst`
 (variable substitution), `mkpasswd` (password hashing); for `make test` also `jq`,
-`shellcheck`, `python3`
+`shellcheck`
 
 ## Layout
 
