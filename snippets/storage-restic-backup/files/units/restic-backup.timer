@@ -2,8 +2,8 @@
 Description=Nightly off-box backup with restic
 
 [Timer]
-# Off the hour, when the snapshots are taken.
-OnCalendar=*-*-* 03:30:00
+# Off the hour, when the snapshots are taken, and well before Flatcar's update window.
+OnCalendar=*-*-* 01:30:00
 Persistent=true
 
 [Install]
