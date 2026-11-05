@@ -23,7 +23,7 @@
 #
 # No ping unless everything worked: the missing ping is the alert. So a stale
 # snapshot fails, because a dead snapshot timer would otherwise look like success
-# forever, and a root with no datasets fails, because an unmounted pool looks
+# forever, and a run that backs nothing up fails, because an unmounted pool looks
 # like that. A failure is reported and the other datasets still run. Prune runs
 # even after a failed backup: running out of space may be why it failed.
 # Usage and config are validated before the first call: exit 2 touches nothing.
@@ -86,7 +86,8 @@ back_up() {
 		log "newest daily snapshot of $name is $((age / 3600)) hours old"
 		return 1
 	}
-	(cd "$mountpoint/.zfs/snapshot/${snap#*@}" && restic backup --tag "$name" --group-by tags .)
+	(cd "$mountpoint/.zfs/snapshot/${snap#*@}" && restic backup --tag "$name" --group-by tags .) || return 1
+	backed_up=$((backed_up + 1))
 }
 
 datasets="$(zfs list -H -o name,mountpoint -d 1 "$root" | { grep -vF "$root"$'\t' || true; })" ||
@@ -99,27 +100,24 @@ datasets="$(zfs list -H -o name,mountpoint -d 1 "$root" | { grep -vF "$root"$'\t
 	exit 1
 }
 
-rc=0
-restic unlock || {
-	log "unlock failed"
-	rc=1
-}
+failed=()
+restic unlock || failed+=(unlock)
+backed_up=0
 while IFS=$'\t' read -r dataset mountpoint; do
-	back_up "$dataset" "$mountpoint" || {
-		log "backup of ${dataset##*/} failed"
-		rc=1
-	}
+	back_up "$dataset" "$mountpoint" || failed+=("${dataset##*/}")
 done <<<"$datasets"
 
-restic forget --group-by tags --keep-daily "$keep_daily" --keep-weekly "$keep_weekly" --keep-monthly "$keep_monthly" --prune || {
-	log "forget and prune failed"
-	rc=1
-}
-restic check || {
-	log "check failed"
-	rc=1
-}
+restic forget --group-by tags --keep-daily "$keep_daily" --keep-weekly "$keep_weekly" --keep-monthly "$keep_monthly" --prune || failed+=(prune)
+restic check || failed+=(check)
 
-[ "$rc" -eq 0 ] || exit "$rc"
+# The reason goes last: restic's output would bury it in the journal.
+if [ "${#failed[@]}" -gt 0 ]; then
+	log "failed: ${failed[*]}"
+	exit 1
+fi
+if [ "$backed_up" -eq 0 ]; then
+	log "failed: nothing backed up"
+	exit 1
+fi
 # The ping's output is dropped: a failure names at most the host, on stderr.
 curl -fsS -m 10 --retry 3 "$HEALTHCHECK_URL" >/dev/null || log "ping failed"

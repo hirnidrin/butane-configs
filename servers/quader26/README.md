@@ -165,7 +165,7 @@ so a reprovision keeps it. It's made by hand and holds, as `NAME=value` lines:
 
 ```
 RESTIC_REPOSITORY RESTIC_PASSWORD HEALTHCHECK_URL
-OS_AUTH_URL OS_USERNAME OS_PASSWORD OS_USER_DOMAIN_NAME OS_PROJECT_NAME OS_PROJECT_DOMAIN_NAME
+OS_AUTH_URL OS_REGION_NAME OS_USERNAME OS_PASSWORD OS_USER_DOMAIN_NAME OS_PROJECT_NAME OS_PROJECT_DOMAIN_NAME
 ```
 
 The `OS_*` values are for a Swift repository. Keep a copy of this file off the
@@ -176,8 +176,10 @@ once, then the first timer run or `sudo systemctl start restic-backup` fills it:
 sudo sh -c 'set -a; . /tank/system/backup/env; restic init'
 ```
 
-When the healthcheck says the ping stopped, read
-`sudo journalctl -u restic-backup -n 50 --no-pager`. It holds no secrets.
+When the healthcheck says the ping stopped, the last lines say why:
+`sudo journalctl -u restic-backup -o cat --no-pager | grep restic-backup: | tail`.
+The password and the ping URL never reach the log. On a failure, restic may print
+the repository and the auth URL.
 
 ## Updating k3s in place
 
