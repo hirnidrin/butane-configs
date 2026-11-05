@@ -72,6 +72,33 @@ for c in hourly daily weekly; do
 	check "snapshots: $c timer enabled" ign_unit_enabled "$ign" "zfs-autosnap@$c.timer"
 done
 
+# --- off-box backups ----------------------------------------------------------
+RESTIC_RAW=restic-v0.19.1-x86-64.raw
+check "restic sysext pinned by hash" test "$(ign_remote "$ign" "/opt/extensions/restic/$RESTIC_RAW")" = \
+	"https://github.com/hirnidrin/sysext-bakery/releases/download/restic-v0.19.1/$RESTIC_RAW sha256-eeb7e5d0af816024c2707ce5941d890130caaedb5ade3a09e91d731a0eec01d1"
+check "restic sysext merged" test "$(ign_link "$ign" /etc/extensions/restic.raw)" = "/opt/extensions/restic/$RESTIC_RAW"
+check "backup: script installed executable" jqe '.storage.files[] | select(.path == "/opt/bin/restic-backup") | .mode == 493' "$ign"
+backupconf="$(ign_file "$ign" /etc/restic-backup.conf)"
+check "backup: projects only" contains "$backupconf" "BACKUP_ROOT=tank/projects"
+check "backup: keep 7 daily" contains "$backupconf" "BACKUP_KEEP_DAILY=7"
+check "backup: keep 4 weekly" contains "$backupconf" "BACKUP_KEEP_WEEKLY=4"
+check "backup: keep 6 monthly" contains "$backupconf" "BACKUP_KEEP_MONTHLY=6"
+check "backup: snapshots go stale after 48 hours" contains "$backupconf" "BACKUP_MAX_AGE_HOURS=48"
+backupsvc="$(ign_unit "$ign" restic-backup.service)"
+check "backup: secrets from the pool" contains "$backupsvc" "EnvironmentFile=/tank/system/backup/env"
+check "backup: requires zfs-mount" contains "$backupsvc" "Requires=zfs-mount.service"
+check "backup: after the pool and the network" contains "$backupsvc" "After=zfs-mount.service network-online.target"
+check "backup: wants the network" contains "$backupsvc" "Wants=network-online.target"
+check "backup: cache on the OS disk" contains "$backupsvc" "Environment=RESTIC_CACHE_DIR=/var/cache/restic"
+check "backup: cache directory made by systemd" contains "$backupsvc" "CacheDirectory=restic"
+backuptimer="$(ign_unit "$ign" restic-backup.timer)"
+check "backup: runs at 03:30, off the hour's snapshots" contains "$backuptimer" "OnCalendar=*-*-* 03:30:00"
+check "backup: catches up after downtime" contains "$backuptimer" "Persistent=true"
+check "backup: timer enabled" ign_unit_enabled "$ign" restic-backup.timer
+for secret in RESTIC_PASSWORD= OS_PASSWORD= HEALTHCHECK_URL= RESTIC_REPOSITORY=; do
+	check "backup: no $secret in the config" test -z "$(grep -F "$secret" "$ign" || true)"
+done
+
 # --- k3s ----------------------------------------------------------------------
 check "k3s sysext pinned by hash" test "$(ign_remote "$ign" /opt/extensions/k3s/k3s-v1.36.5+k3s1-x86-64.raw)" = \
 	"https://extensions.flatcar.org/extensions/k3s-v1.36.5+k3s1-x86-64.raw sha256-e126e3df8469d59a84b6add3874c72d8c0a286a349749e18e49ff939a02b16e9"

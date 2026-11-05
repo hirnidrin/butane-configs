@@ -1,0 +1,12 @@
+[Unit]
+Description=Off-box backup with restic
+Requires=zfs-mount.service
+After=zfs-mount.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/tank/system/backup/env
+Environment=RESTIC_CACHE_DIR=/var/cache/restic
+CacheDirectory=restic
+ExecStart=/opt/bin/restic-backup

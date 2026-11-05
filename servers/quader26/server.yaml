@@ -15,6 +15,7 @@ snippets:
   - hw-ipmi-fans
   - storage-zfs-import
   - storage-zfs-snapshots
+  - storage-restic-backup
   - app-k3s-server
 
 # --- frame -------------------------------------------------------------------
