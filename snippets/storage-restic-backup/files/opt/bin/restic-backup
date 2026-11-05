@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# restic-backup - back up each dataset under a root from its newest daily
+# snapshot, prune, check, and ping a healthcheck if all of it succeeded
+#
+#   restic-backup
+#
+# Config, sourced from RESTIC_BACKUP_CONF (default /etc/restic-backup.conf):
+#   BACKUP_ROOT            parent of the datasets to back up, e.g. "tank/projects"
+#   BACKUP_KEEP_DAILY      how many of each to keep, per dataset, >= 1
+#   BACKUP_KEEP_WEEKLY
+#   BACKUP_KEEP_MONTHLY
+#   BACKUP_MAX_AGE_HOURS   a daily snapshot older than this is a failure, >= 1
+#
+# Secrets come from the environment, set by the service's EnvironmentFile:
+#   RESTIC_REPOSITORY, RESTIC_PASSWORD, HEALTHCHECK_URL, and the backend's own
+#   (OS_* for Swift). This script never prints them.
+#
+# Reads <dataset>@autosnap-daily-*, so each dataset is captured at one moment.
+# Running from inside the snapshot and backing up "." keeps paths in the backup
+# relative to the dataset, and --group-by tags finds the parent even though the
+# snapshot's path changes every night.
+#
+# No ping unless everything worked: the missing ping is the alert. So a stale
+# snapshot fails, because a dead snapshot timer would otherwise look like success
+# forever, and a root with no datasets fails, because an unmounted pool looks
+# like that. A failure is reported and the other datasets still run. Prune runs
+# even after a failed backup: running out of space may be why it failed.
+# Usage and config are validated before the first call: exit 2 touches nothing.
+#
+set -euo pipefail
+
+die() {
+	echo "restic-backup: $*" >&2
+	exit 2
+}
+
+log() { echo "restic-backup: $*" >&2; }
+
+[ $# -eq 0 ] || die "usage: restic-backup"
+
+conf="${RESTIC_BACKUP_CONF:-/etc/restic-backup.conf}"
+[ -r "$conf" ] || die "cannot read $conf"
+# shellcheck disable=SC1090
+. "$conf"
+
+root="${BACKUP_ROOT:-}"
+keep_daily="${BACKUP_KEEP_DAILY:-}"
+keep_weekly="${BACKUP_KEEP_WEEKLY:-}"
+keep_monthly="${BACKUP_KEEP_MONTHLY:-}"
+max_age_hours="${BACKUP_MAX_AGE_HOURS:-}"
+
+[[ "$root" =~ ^[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*$ ]] || die "bad BACKUP_ROOT '$root'"
+[[ "$keep_daily" =~ ^[1-9][0-9]*$ ]] || die "bad BACKUP_KEEP_DAILY '$keep_daily'"
+[[ "$keep_weekly" =~ ^[1-9][0-9]*$ ]] || die "bad BACKUP_KEEP_WEEKLY '$keep_weekly'"
+[[ "$keep_monthly" =~ ^[1-9][0-9]*$ ]] || die "bad BACKUP_KEEP_MONTHLY '$keep_monthly'"
+[[ "$max_age_hours" =~ ^[1-9][0-9]*$ ]] || die "bad BACKUP_MAX_AGE_HOURS '$max_age_hours'"
+[ -n "${RESTIC_REPOSITORY:-}" ] || die "no RESTIC_REPOSITORY"
+[ -n "${RESTIC_PASSWORD:-}" ] || die "no RESTIC_PASSWORD"
+[ -n "${HEALTHCHECK_URL:-}" ] || die "no HEALTHCHECK_URL"
+
+now="$(date +%s)"
+max_age=$((max_age_hours * 3600))
+
+# back_up <dataset> <mountpoint> - called after ||, so set -e is off in here:
+# every failure returns explicitly.
+back_up() {
+	local dataset="$1" mountpoint="$2" name="${1##*/}" line snap created age
+	line="$(zfs list -Hp -t snapshot -o name,creation -s creation -d 1 "$dataset" |
+		{ grep -F "$dataset@autosnap-daily-" || true; } |
+		tail -n 1)" || return 1
+	if [ -z "$line" ]; then
+		created="$(zfs list -Hp -o creation "$dataset")" || return 1
+		age=$((now - created))
+		[ "$age" -ge "$max_age" ] || {
+			log "$name has no daily snapshot yet, skipped"
+			return 0
+		}
+		log "$name has no daily snapshot, and it is $((age / 3600)) hours old"
+		return 1
+	fi
+	snap="$(cut -f1 <<<"$line")"
+	created="$(cut -f2 <<<"$line")"
+	age=$((now - created))
+	[ "$age" -lt "$max_age" ] || {
+		log "newest daily snapshot of $name is $((age / 3600)) hours old"
+		return 1
+	}
+	(cd "$mountpoint/.zfs/snapshot/${snap#*@}" && restic backup --tag "$name" --group-by tags .)
+}
+
+datasets="$(zfs list -H -o name,mountpoint -d 1 "$root" | { grep -vF "$root"$'\t' || true; })" ||
+	{
+		log "cannot list $root"
+		exit 1
+	}
+[ -n "$datasets" ] || {
+	log "no datasets under $root"
+	exit 1
+}
+
+rc=0
+restic unlock || {
+	log "unlock failed"
+	rc=1
+}
+while IFS=$'\t' read -r dataset mountpoint; do
+	back_up "$dataset" "$mountpoint" || {
+		log "backup of ${dataset##*/} failed"
+		rc=1
+	}
+done <<<"$datasets"
+
+restic forget --group-by tags --keep-daily "$keep_daily" --keep-weekly "$keep_weekly" --keep-monthly "$keep_monthly" --prune || {
+	log "forget and prune failed"
+	rc=1
+}
+restic check || {
+	log "check failed"
+	rc=1
+}
+
+[ "$rc" -eq 0 ] || exit "$rc"
+# The ping's output is dropped: a failure names at most the host, on stderr.
+curl -fsS -m 10 --retry 3 "$HEALTHCHECK_URL" >/dev/null || log "ping failed"
