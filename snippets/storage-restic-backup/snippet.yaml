@@ -1,0 +1,45 @@
+# storage-restic-backup - nightly off-box backup of each dataset under a root,
+# from its newest daily snapshot, with restic
+#
+# Optional vars: RESTIC_VERSION, RESTIC_SHA256, BACKUP_ROOT, BACKUP_KEEP_DAILY,
+#                BACKUP_KEEP_WEEKLY, BACKUP_KEEP_MONTHLY, BACKUP_MAX_AGE_HOURS
+#                (see defaults.env)
+#
+# Plain ZFS and restic on the host, so backups keep running when the workloads
+# are broken. Needs storage-zfs-import and storage-zfs-snapshots. Missed runs
+# (host down) are caught up at boot.
+#
+# Secrets are deliberately NOT here: Ignition configs aren't secret. The service
+# reads /tank/system/backup/env, a root-only file on the pool made by hand, so
+# it survives a reprovision (see the server README).
+#
+# The image is downloaded once at provisioning and verified against the pinned
+# hash. A new version is a change to the two variables and a reprovision, or the
+# same files copied by hand and a reboot.
+storage:
+  files:
+    - path: /opt/extensions/restic/restic-${RESTIC_VERSION}-x86-64.raw
+      mode: 0644
+      contents:
+        source: https://github.com/hirnidrin/sysext-bakery/releases/download/restic-${RESTIC_VERSION}/restic-${RESTIC_VERSION}-x86-64.raw
+        verification:
+          hash: sha256-${RESTIC_SHA256}
+    - path: /opt/bin/restic-backup
+      mode: 0755
+      contents:
+        local: opt/bin/restic-backup
+    - path: /etc/restic-backup.conf
+      mode: 0644
+      contents:
+        local: etc/restic-backup.conf
+  links:
+    - path: /etc/extensions/restic.raw
+      target: /opt/extensions/restic/restic-${RESTIC_VERSION}-x86-64.raw
+      hard: false
+systemd:
+  units:
+    - name: restic-backup.service
+      contents_local: units/restic-backup.service
+    - name: restic-backup.timer
+      enabled: true
+      contents_local: units/restic-backup.timer

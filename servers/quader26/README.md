@@ -63,7 +63,7 @@ Option ROM `Legacy`. The installed system boots either way.
 8. `ssh core@quader26`
 
 On first boot Flatcar downloads the zfs sysext, and Ignition downloads the
-ipmitool and k3s sysexts. The box needs internet access.
+ipmitool, restic and k3s sysexts. The box needs internet access.
 
 ## First provision only: create the pool
 
@@ -80,6 +80,8 @@ sudo zpool create \
   tank mirror /dev/disk/by-id/<disk-a> /dev/disk/by-id/<disk-b>
 sudo zfs create -p -o mountpoint=/var/lib/rancher/k3s/agent/containerd tank/system/containerd
 sudo zfs create tank/projects
+sudo zfs create tank/system/backup
+sudo chmod 700 /tank/system/backup
 sudo systemctl restart k3s
 ```
 
@@ -145,14 +147,37 @@ This is cluster-admin. It stays on the workstation and never goes into a pod.
 ## Checks
 
 ```sh
-systemd-sysext status                     # zfs, ipmitool, k3s; no docker-flatcar / containerd-flatcar
+systemd-sysext status                     # zfs, ipmitool, restic, k3s; no docker-flatcar / containerd-flatcar
 systemctl status fanspeed                 # succeeded
 sudo ipmitool sensor | grep -i fan
 zpool status tank                         # mirror, ONLINE
-systemctl list-timers 'zfs-autosnap@*'
+systemctl list-timers 'zfs-autosnap@*' restic-backup.timer
 zfs list -t snapshot -r tank/projects
 zfs list -t snapshot -r tank/quaipa
 ```
+
+## Backups
+
+`restic-backup.timer` backs up each dataset under `tank/projects` every night,
+from its newest daily snapshot, and pings a healthcheck if all of it worked. It
+reads its secrets from `/tank/system/backup/env`, mode 600, root's, on the pool
+so a reprovision keeps it. It's made by hand and holds, as `NAME=value` lines:
+
+```
+RESTIC_REPOSITORY RESTIC_PASSWORD HEALTHCHECK_URL
+OS_AUTH_URL OS_USERNAME OS_PASSWORD OS_USER_DOMAIN_NAME OS_PROJECT_NAME OS_PROJECT_DOMAIN_NAME
+```
+
+The `OS_*` values are for a Swift repository. Keep a copy of this file off the
+box: without `RESTIC_PASSWORD` the backups can't be read. Create the repository
+once, then the first timer run or `sudo systemctl start restic-backup` fills it:
+
+```sh
+sudo sh -c 'set -a; . /tank/system/backup/env; restic init'
+```
+
+When the healthcheck says the ping stopped, read
+`sudo journalctl -u restic-backup -n 50 --no-pager`. It holds no secrets.
 
 ## Updating k3s in place
 
